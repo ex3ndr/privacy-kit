@@ -1,0 +1,4 @@
+export { decodeBase64, encodeBase64 } from './modules/formats/base64';
+export { decodeHex, encodeHex } from './modules/formats/hex';
+export { createNitroHttpAgent, fetchAttestation } from './modules/aws/nitroSocket';
+export type { NitroEnclaveAttestation } from './modules/aws/nitro';

@@ -1,5 +1,5 @@
 import * as https from "https";
-import tls from 'tls';
+import * as tls from 'tls';
 import { randomBytes } from 'crypto';
 import { IncomingMessage } from 'http';
 import { parseNitroEnclaveAttestation } from "./nitro";
@@ -54,7 +54,7 @@ async function createNitroConnection(host: string, port: number, trusted: {
         socket.once('secureConnect', () => {
             resolve(socket);
         });
-        socket.once('error', (err) => {
+        socket.once('error', (err: any) => {
             reject(err);
         });
     });
@@ -118,7 +118,7 @@ export function createNitroHttpAgent(opts: {
     const agent = new https.Agent({
         rejectUnauthorized: false,
     });
-    (agent as any).createConnection = function (options, oncreate) {
+    (agent as any).createConnection = function (options: any, oncreate: any) {
         createNitroConnection(options.host, options.port, opts.trusted).then((result) => {
             oncreate(null, result);
         }).catch((err) => {
