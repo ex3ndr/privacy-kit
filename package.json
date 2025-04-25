@@ -21,6 +21,7 @@
     "@peculiar/x509": "^1.12.3",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/hex": "^2.0.1",
+    "axios": "^1.9.0",
     "zod": "^3.24.3"
   }
 }
