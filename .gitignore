@@ -1,2 +1,5 @@
 node_modules
 dist
+docker/nitro-hello/enclave.eif
+docker/nitro-hello/enclave.tar
+docker/nitro-hello/enclave.json

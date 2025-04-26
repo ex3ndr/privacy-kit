@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 	"syscall"
 
@@ -20,7 +19,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatalf("usage: envclient <command> [args...]")
+		log.Fatalf("usage: boot <command> [args...]")
 	}
 
 	// Open connection to host
@@ -68,13 +67,18 @@ func main() {
 		log.Printf("🌐 pulled %s=%s", k, v)
 	}
 
-	// Replace the current process with the target command
-	cmd, err := exec.LookPath(os.Args[1])
-	if err != nil {
-		log.Fatalf("lookPath: %v", err)
+	// Start daemon
+	cmd := "/proxy/nitriding-daemon"
+	args:= []string{
+		cmd, // First argument must be the program name
+		"-fqdn", "localhost",
+		"-extport", "8443",
+		"-intport", "8081",
+		"-appwebsrv", "http://localhost:8080",
+		"-appcmd", strings.Join(os.Args[1:], " "),
 	}
-	log.Printf("🌐 pulled %d vars – launching %s", len(env), cmd)
-	if err := syscall.Exec(cmd, os.Args[1:], os.Environ()); err != nil {
+	log.Printf("🌐 launching %s %s", cmd, strings.Join(args[1:], " "))
+	if err := syscall.Exec(cmd, args, os.Environ()); err != nil {
 		log.Fatalf("exec: %v", err)
 	}
 }

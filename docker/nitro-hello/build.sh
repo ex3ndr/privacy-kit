@@ -3,8 +3,9 @@ set -e
 
 # Parameters
 ARCH=amd64
+IMAGE="public.ecr.aws/g7d0a3u1/nitro/hello:v6"
 image_tar="enclave.tar"
-image_tag="public.ecr.aws/g7d0a3u1/nitro/hello:v1"
+image_tag="enclave:latest"
 image_eif="enclave.eif"
 
 # Build the enclave docker image reproducibly
@@ -46,7 +47,5 @@ docker run --rm \
 echo "Enclave size: $(ls -lh $image_eif | awk '{print $5}')"
 
 # Build output image
-docker build --platform linux/amd64 -t enclave-output:latest -f Dockerfile.host .
-
-# Push
-docker push $image_tag
+docker build --platform linux/amd64 -t $IMAGE -f Dockerfile.host .
+docker push $IMAGE
