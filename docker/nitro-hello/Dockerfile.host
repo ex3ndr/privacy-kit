@@ -1,0 +1,2 @@
+FROM public.ecr.aws/g7d0a3u1/nitro/host:v4
+ADD enclave.eif /app/

@@ -3,7 +3,7 @@ set -e
 
 # Define variables
 IMAGE_NAME="public.ecr.aws/g7d0a3u1/nitro/host"
-IMAGE_TAG="v4"
+IMAGE_TAG="v5"
 
 # Build directory path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -16,7 +16,7 @@ const port = uint32(1025) // enclave will dial (cid 3, port 1025)
 func main() {
 	// Process environment variables once at startup
 	env := map[string]string{}
-	prefix := "ENCLAVE_"
+	prefix := "ENCLAVE_SECRET_"
 	for _, kv := range os.Environ() {
 		if i := strings.IndexByte(kv, '='); i > 0 {
 			key := kv[:i]
