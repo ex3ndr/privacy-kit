@@ -11,7 +11,7 @@ import (
 )
 
 // change with -port= if you need a different one
-const port = uint32(1025) // enclave will dial (cid 3, port 5007)
+const port = uint32(1025) // enclave will dial (cid 3, port 1025)
 
 func main() {
 	// Process environment variables once at startup
