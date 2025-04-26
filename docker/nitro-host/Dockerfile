@@ -25,6 +25,9 @@ RUN \
 
 FROM public.ecr.aws/docker/library/golang:1.23.0-bookworm@sha256:31dc846dd1bcca84d2fa231bcd16c09ff271bcc1a5ae2c48ff10f13b039688f3 AS env-server-builder
 WORKDIR /build
+ADD go.mod .
+ADD go.sum .
+RUN go mod download
 ADD env-server.go .
 RUN CGO_ENABLED=0 go build -o env-server env-server.go
 
@@ -43,13 +46,15 @@ RUN chmod +x /gvproxy
 
 FROM public.ecr.aws/docker/library/amazonlinux:2
 WORKDIR /app
+
+# Copy Nitro Enclaves dependencies
 COPY --from=builder /ne-deps/etc /etc
 COPY --from=builder /ne-deps/lib64 /lib64
 COPY --from=builder /ne-deps/run /run
 COPY --from=builder /ne-deps/usr /usr
 COPY --from=builder /ne-deps/var /var
 
-# Add gvproxy - Multi-platform support without wget
+# Copy gvproxy
 ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
       echo "Using ARM64 build"; \
@@ -66,6 +71,9 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     fi && \
     chmod +x /app/gvproxy && \
     rm /app/gvproxy-amd64 /app/gvproxy-arm64
+
+# Copy env-server
+COPY --from=env-server-builder /build/env-server /app/env-server
 
 # Write boot script
 ADD boot.sh /app

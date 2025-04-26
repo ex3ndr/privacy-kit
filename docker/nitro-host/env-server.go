@@ -30,7 +30,7 @@ func main() {
 		}
 	}
 	
-	ln, err := vsock.Listen(vsock.Host, port) // Host CID == 3
+	ln, err := vsock.Listen(port, nil) // Host CID == 3
 	if err != nil {
 		log.Fatalf("vsock listen: %v", err)
 	}
