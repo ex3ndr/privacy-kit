@@ -7,9 +7,16 @@ export {
     encodeHex
 } from './modules/formats/hex';
 export {
+    decodeUTF8,
+    encodeUTF8
+} from './modules/formats/utf8';
+export {
     createNitroHttpAgent,
     fetchAttestation
 } from './modules/aws/nitroSocket';
 export type {
     NitroEnclaveAttestation
 } from './modules/aws/nitro';
+export {
+    request
+} from './modules/requests/request';
