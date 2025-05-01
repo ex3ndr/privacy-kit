@@ -11,7 +11,8 @@ export {
     encodeUTF8
 } from './modules/formats/utf8';
 export {
-    concatBytes
+    concatBytes,
+    equalBytes
 } from './modules/formats/bytes';
 export {
     createNitroHttpAgent,
