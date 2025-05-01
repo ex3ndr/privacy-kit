@@ -11,6 +11,9 @@ export {
     encodeUTF8
 } from './modules/formats/utf8';
 export {
+    concatBytes
+} from './modules/formats/bytes';
+export {
     createNitroHttpAgent,
     fetchAttestation
 } from './modules/aws/nitroSocket';
@@ -20,3 +23,9 @@ export type {
 export {
     request
 } from './modules/requests/request';
+export {
+    safeCrypto as crypto
+} from './modules/crypto/_safe';
+export {
+    KeyTree
+} from './modules/tree/keyTree';
