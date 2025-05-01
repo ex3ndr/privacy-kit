@@ -9,9 +9,9 @@ const PACKAGE_AES_BUFFER = 0;
 
 export class KeyTree {
 
-    static async create(src: string, usage: string) {
+    static async create(key: string | Uint8Array | Buffer, usage: string) {
         const derived = await deriveSecureKey({
-            key: src,
+            key: key,
             usage: usage
         });
         return new KeyTree(derived, usage);
