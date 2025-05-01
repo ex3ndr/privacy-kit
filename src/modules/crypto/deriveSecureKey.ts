@@ -17,6 +17,6 @@ import { pbkdf2_sha512 } from "./pbkdf2_sha512"
  *   usage: "My App Encryption" 
  * });
  */
-export async function deriveSecureKey(opts: { key: string, usage: string }): Promise<Uint8Array> {
+export async function deriveSecureKey(opts: { key: string | Uint8Array | Buffer, usage: string | Uint8Array | Buffer }): Promise<Uint8Array> {
     return await pbkdf2_sha512(opts.key, opts.usage, 210000, 64); // Recommended by OWASP
 }
