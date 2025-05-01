@@ -17,6 +17,9 @@ export {
     createNitroHttpAgent,
     fetchAttestation
 } from './modules/aws/nitroSocket';
+export {
+    parseNitroEnclaveAttestation
+} from './modules/aws/nitro';
 export type {
     NitroEnclaveAttestation
 } from './modules/aws/nitro';
