@@ -2,7 +2,7 @@ import * as https from "https";
 import * as tls from 'tls';
 import { randomBytes } from 'crypto';
 import { IncomingMessage } from 'http';
-import { parseNitroEnclaveAttestation } from "./nitro";
+import { NitroEnclaveAttestation, parseNitroEnclaveAttestation } from "./nitro";
 import { decodeHex } from "../formats/hex";
 
 export async function fetchAttestation(host: string, port: number) {
@@ -42,7 +42,7 @@ export async function fetchAttestation(host: string, port: number) {
 async function createNitroConnection(host: string, port: number, trusted: {
     pcr1: string,
     pcr2: string
-}[]) {
+}[] | ((document: NitroEnclaveAttestation) => Promise<boolean>)) {
 
     // Create TLS socket
     const socket = await new Promise<tls.TLSSocket>((resolve, reject) => {
@@ -86,16 +86,20 @@ async function createNitroConnection(host: string, port: number, trusted: {
 
         // Verify kernels
         let found = false;
-        for (const t of trusted) {
-            const pcr1 = attestation.document.pcrs[1];
-            const pcr2 = attestation.document.pcrs[2];
-            if (!pcr1 || !pcr2) {
-                throw new Error('No PCR');
+        if (Array.isArray(trusted)) {
+            for (const t of trusted) {
+                const pcr1 = attestation.document.pcrs[1];
+                const pcr2 = attestation.document.pcrs[2];
+                if (!pcr1 || !pcr2) {
+                    throw new Error('No PCR');
+                }
+                if (pcr1.toLowerCase() === t.pcr1.toLowerCase() && pcr2.toLowerCase() === t.pcr2.toLowerCase()) {
+                    found = true;
+                    break;
+                }
             }
-            if (pcr1.toLowerCase() === t.pcr1.toLowerCase() && pcr2.toLowerCase() === t.pcr2.toLowerCase()) {
-                found = true;
-                break;
-            }
+        } else {
+            found = await trusted(attestation);
         }
         if (!found) {
             throw new Error('Untrusted');

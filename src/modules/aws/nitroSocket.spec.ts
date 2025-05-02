@@ -3,7 +3,7 @@ import { createNitroHttpAgent, fetchAttestation } from "./nitroSocket";
 import * as axios from "axios";
 
 describe('nitroSocket', () => {
-    it.skip('should connect', async () => {
+    it('should connect', async () => {
         // const attestation = await fetchAttestation('localhost', 55109);
         const agent = createNitroHttpAgent({
             trusted: [{
@@ -14,7 +14,13 @@ describe('nitroSocket', () => {
         const client = new axios.Axios({
             httpsAgent: agent,
         });
-        const response = await client.get('https://localhost:55109/');
+        const response = await client.post('https://localhost:55109/', JSON.stringify({
+            message: 'Hello, world!'
+        }), {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         console.log(response.data);
     });
 });
