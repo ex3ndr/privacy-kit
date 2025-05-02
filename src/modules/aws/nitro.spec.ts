@@ -16,5 +16,8 @@ describe('nitro', () => {
         const data2 = await fs.readFile(__dirname + '/__testdata__/nitro_debug.txt', 'utf-8');
         vi.setSystemTime(1745522460500);
         expect((await parseNitroEnclaveAttestation(data2)).document).toMatchSnapshot();
+        const data3 = await fs.readFile(__dirname + '/__testdata__/nitro_debug_native.txt', 'utf-8');
+        vi.setSystemTime(1746152924000);
+        expect((await parseNitroEnclaveAttestation(data3)).document).toMatchSnapshot();
     });
 }); 
