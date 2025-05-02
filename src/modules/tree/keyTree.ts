@@ -4,6 +4,7 @@ import { deriveKey } from "../crypto/deriveKey";
 import { deriveSecureKey } from "../crypto/deriveSecureKey"
 import * as crypto from 'crypto';
 import * as tweetnacl from 'tweetnacl';
+import { hmac_sha512 } from "../crypto/hmac_sha512";
 
 const PACKAGE_AES_BUFFER = 0;
 
@@ -41,6 +42,15 @@ export class KeyTree {
             secret: keypair.secretKey,
             public: keypair.publicKey
         };
+    }
+
+    //
+    // Hashing
+    //
+
+    hash(path: string[], data: Uint8Array|string): Uint8Array {
+        const key = this.#deriveKey('hmac_sha512', [...path]);
+        return hmac_sha512(key, data);
     }
 
     //
