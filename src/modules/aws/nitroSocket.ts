@@ -116,7 +116,7 @@ export function createNitroHttpAgent(opts: {
     trusted: {
         pcr1: string,
         pcr2: string
-    }[]
+    }[] | ((document: NitroEnclaveAttestation) => Promise<boolean>)
 }) {
 
     const agent = new https.Agent({
