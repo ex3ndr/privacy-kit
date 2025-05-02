@@ -22,3 +22,16 @@ export function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
     }
     return result === 0;
 }
+
+export function encodeUInt32(value: number): Uint8Array {
+    return new Uint8Array([
+        (value >> 24) & 0xff,
+        (value >> 16) & 0xff,
+        (value >> 8) & 0xff,
+        value & 0xff
+    ]);
+}
+
+export function decodeUInt32(value: Uint8Array): number {
+    return (value[0] << 24) | (value[1] << 16) | (value[2] << 8) | value[3];
+}

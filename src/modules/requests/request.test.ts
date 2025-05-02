@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { encodeRequest, decodeRequest, encryptResponse, decryptResponse } from './request';
 import * as nacl from "tweetnacl";
 import * as z from "zod";
@@ -51,6 +51,27 @@ describe('Request Module', () => {
       const result = await decodeRequest(invalidData, schema);
       expect(result).toBeNull();
     });
+
+    it('should return null for expired requests', async () => {
+      const originalData = { message: 'Hello, World!' };
+      const encoded = await encodeRequest(originalData);
+      const schema = z.object({
+        message: z.string(),
+      });
+
+      // Mock Date.now to simulate time passing
+      const originalNow = Date.now;
+      const mockNow = vi.spyOn(Date, 'now');
+      
+      // Set time to 5 minutes and 1 second in the future
+      mockNow.mockImplementation(() => originalNow() + (5 * 60 * 1000) + 1000);
+
+      const decoded = await decodeRequest(encoded.data, schema);
+      expect(decoded).toBeNull();
+
+      // Restore original Date.now
+      mockNow.mockRestore();
+    });
   });
 
   describe('encryptResponse', () => {
@@ -102,6 +123,34 @@ describe('Request Module', () => {
 
       const result = await decryptResponse(invalidData, nonce, secretKey, schema);
       expect(result).toBeNull();
+    });
+
+    it('should return null for expired responses', async () => {
+      const originalData = { status: 'success', message: 'Operation completed' };
+      const schema = z.object({
+        status: z.string(),
+        message: z.string(),
+      });
+      const nonce = new Uint8Array(24);
+
+      // Create a keypair for the recipient
+      const recipientKeypair = nacl.box.keyPair();
+
+      // Encrypt the data using the recipient's public key
+      const encrypted = await encryptResponse(originalData, nonce, recipientKeypair.publicKey);
+
+      // Mock Date.now to simulate time passing
+      const originalNow = Date.now;
+      const mockNow = vi.spyOn(Date, 'now');
+      
+      // Set time to 5 minutes and 1 second in the future
+      mockNow.mockImplementation(() => originalNow() + (5 * 60 * 1000) + 1000);
+
+      const decrypted = await decryptResponse(encrypted, nonce, recipientKeypair.secretKey, schema);
+      expect(decrypted).toBeNull();
+
+      // Restore original Date.now
+      mockNow.mockRestore();
     });
   });
 
