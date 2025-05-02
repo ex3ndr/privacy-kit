@@ -10,6 +10,7 @@ export async function encodeRequest<T>(body: T) {
         data: new Uint8Array([0, ...nonce, ...keypair.publicKey, ...data]),
         nonce,
         secretKey: keypair.secretKey,
+        publicKey: keypair.publicKey
     }
 }
 
