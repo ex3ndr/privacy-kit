@@ -1,5 +1,5 @@
 import * as nacl from "tweetnacl";
-import { decodeUTF8, encodeUTF8 } from "../formats/utf8";
+import { decodeUTF8, encodeUTF8 } from "../formats/text";
 import * as z from "zod";
 import { decodeUInt32, encodeUInt32 } from "../formats/bytes";
 

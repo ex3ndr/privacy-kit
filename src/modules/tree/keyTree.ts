@@ -1,5 +1,5 @@
 import { concatBytes } from "../formats/bytes";
-import { decodeUTF8, encodeUTF8 } from "../formats/utf8";
+import { decodeUTF8, encodeUTF8 } from "../formats/text";
 import { deriveKey } from "../crypto/deriveKey";
 import { deriveSecureKey } from "../crypto/deriveSecureKey"
 import * as crypto from 'crypto';

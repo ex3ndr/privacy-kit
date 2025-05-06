@@ -1,7 +1,7 @@
 import { expect, describe, it } from "vitest";
 import { sha512 } from "./sha512";
 import { decodeHex } from "../formats/hex";
-import { encodeUTF8 } from "../formats/utf8";
+import { encodeUTF8 } from "../formats/text";
 
 // https://www.di-mgt.com.au/sha_testvectors.html
 const VECTORS = [

@@ -1,5 +1,5 @@
 import { concatBytes } from "../formats/bytes";
-import { encodeUTF8 } from "../formats/utf8";
+import { encodeUTF8 } from "../formats/text";
 import { hmac_sha512 } from "./hmac_sha512";
 
 export type KeyTreeState = {

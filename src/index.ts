@@ -8,14 +8,19 @@ export {
 } from './modules/formats/hex';
 export {
     decodeUTF8,
-    encodeUTF8
-} from './modules/formats/utf8';
+    encodeUTF8,
+    normalizeNFKD
+} from './modules/formats/text';
 export {
     concatBytes,
     equalBytes,
     encodeUInt32,
     decodeUInt32
 } from './modules/formats/bytes';
+export {
+    encodeBip39,
+    decodeBip39
+} from './modules/formats/bip39';
 export {
     createNitroHttpAgent,
     fetchAttestation

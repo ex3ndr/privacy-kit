@@ -1,6 +1,6 @@
 import { expect, describe, it } from "vitest";
 import { hmac_sha512 } from "./hmac_sha512";
-import { encodeUTF8 } from "../formats/utf8";
+import { encodeUTF8 } from "../formats/text";
 import { decodeHex } from "../formats/hex";
 
 // Test Vectors

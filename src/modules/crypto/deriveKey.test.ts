@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { deriveKey, deriveSecretKeyTreeRoot, deriveSecretKeyTreeChild } from './deriveKey';
-import { encodeUTF8 } from '../formats/utf8';
+import { encodeUTF8 } from '../formats/text';
 import { encodeHex } from '../formats/hex';
 
 describe('Key Derivation Tests', () => {
