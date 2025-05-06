@@ -22,6 +22,11 @@ export {
     decodeBip39
 } from './modules/formats/bip39';
 export {
+    oprfServer,
+    oprfClient,
+    oprfServerPrivateKey
+} from './modules/oprf/oprf';
+export {
     createNitroHttpAgent,
     fetchAttestation
 } from './modules/aws/nitroSocket';
