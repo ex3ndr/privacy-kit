@@ -26,7 +26,10 @@ export {
     oprfClient,
     voprfClient,
     voprfServer,
-    oprfKeyPair,
+    oprfDeriveKeyPair,
+    voprfDeriveKeyPair,
+    oprfGenerateKeyPair,
+    voprfGenerateKeyPair
 } from './modules/oprf/oprf';
 export {
     createNitroHttpAgent,

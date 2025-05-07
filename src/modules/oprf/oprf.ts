@@ -1,4 +1,5 @@
 import {
+    derivePrivateKey,
     Evaluation,
     EvaluationRequest,
     FinalizeData,
@@ -7,8 +8,9 @@ import {
     OPRFServer,
     randomPrivateKey,
     VOPRFClient,
-    VOPRFServer
+    VOPRFServer,
 } from '@cloudflare/voprf-ts';
+import { RistrettoPoint } from '@noble/curves/ed25519';
 import { encodeUTF8 } from '../formats/text';
 
 const cryptoProvider = require('@cloudflare/voprf-ts/crypto-noble').CryptoNoble;
@@ -96,7 +98,38 @@ export function voprfServer(algo: 'ristretto255', secretKey: Uint8Array) {
 // Key Generation
 //
 
-export async function oprfKeyPair(algo: 'ristretto255' | 'p256') {
+export async function oprfDeriveKeyPair(algo: 'ristretto255' | 'p256',seed: Uint8Array) {
+    const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
+    const privateKey = await derivePrivateKey(Oprf.Mode.OPRF, suite, seed, cryptoProvider);
+    const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
+    return {
+        privateKey,
+        publicKey
+    }
+}
+
+export async function voprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Uint8Array) {
+    const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
+    const privateKey = await derivePrivateKey(Oprf.Mode.VOPRF, suite, seed, cryptoProvider);
+    const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
+    return {
+        privateKey,
+        publicKey
+    }
+}
+
+export async function oprfGenerateKeyPair(algo: 'ristretto255' | 'p256') {
+    const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
+    const privateKey = await randomPrivateKey(suite, cryptoProvider);
+    const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
+    return {
+        privateKey,
+        publicKey
+    }
+}
+
+
+export async function voprfGenerateKeyPair(algo: 'ristretto255' | 'p256') {
     const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
     const privateKey = await randomPrivateKey(suite, cryptoProvider);
     const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
