@@ -53,3 +53,9 @@ export {
 export {
     KeyTree
 } from './modules/tree/keyTree';
+export {
+    ExpirableMap
+} from './modules/collections/ExpirableMap';
+export {
+    monotonicNow
+} from './modules/time/monotonicNow';
