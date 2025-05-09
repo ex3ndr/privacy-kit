@@ -21,6 +21,25 @@ curl \
   -X POST \
   -d '{"local":":8443","remote":"192.168.127.2:8443"}'
 
+# Configure additional ports defined in EXTRA_PORTS (comma-separated, e.g., "8080,9000")
+if [ -n "$EXTRA_PORTS" ]; then
+  echo "Configuring extra port forwarding for: $EXTRA_PORTS"
+  # Split the comma-separated list into an array
+  IFS=',' read -ra EXTRA_PORT_ARRAY <<< "$EXTRA_PORTS"
+  for PORT in "${EXTRA_PORT_ARRAY[@]}"; do
+    # Trim possible whitespace
+    PORT_TRIMMED="$(echo -e "${PORT}" | tr -d '[:space:]')"
+    if [ -n "$PORT_TRIMMED" ]; then
+      echo "Exposing port $PORT_TRIMMED..."
+      curl \
+        --unix-socket /tmp/network.sock \
+        http:/unix/services/forwarder/expose \
+        -X POST \
+        -d "{\"local\":\":${PORT_TRIMMED}\",\"remote\":\"192.168.127.2:${PORT_TRIMMED}\"}"
+    fi
+  done
+fi
+
 #
 # Env server
 #
