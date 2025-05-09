@@ -32,6 +32,9 @@ export {
     voprfGenerateKeyPair
 } from './modules/oprf/oprf';
 export {
+    ephemeralToken
+} from './modules/tokens/ephemeral';
+export {
     createNitroHttpAgent,
     fetchAttestation
 } from './modules/aws/nitroSocket';
