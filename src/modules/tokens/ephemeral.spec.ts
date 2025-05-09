@@ -12,11 +12,12 @@ describe('Ephemeral Token Generator', () => {
             service: 'test',
             publicKey: generator.publicKey
         });
-        const token = await generator.new('some-user-id');
+        const token = await generator.new({ user: 'some-user-id' });
         const result = await verifier.verify(token);
         expect(result).not.toBeNull();
-        expect(result?.userId).toBe('some-user-id');
+        expect(result?.user).toBe('some-user-id');
         expect(result?.uuid).not.toBeNull();
+        console.log(token);
     });
 
     it('should expire after ttl', async () => {
@@ -29,7 +30,7 @@ describe('Ephemeral Token Generator', () => {
             service: 'test',
             publicKey: generator.publicKey
         });
-        const token = await generator.new('some-user-id');
+        const token = await generator.new({ user: 'some-user-id' });
         await new Promise(resolve => setTimeout(resolve, 10)); // Wait for token to expire
         const result = await verifier.verify(token);
         expect(result).toBeNull();
@@ -45,7 +46,7 @@ describe('Ephemeral Token Generator', () => {
             service: 'test2',
             publicKey: generator.publicKey
         });
-        const token = await generator.new('some-user-id');
+        const token = await generator.new({ user: 'some-user-id' });
         const result = await verifier.verify(token);
         expect(result).toBeNull();
     });
@@ -65,7 +66,7 @@ describe('Ephemeral Token Generator', () => {
             service: 'test',
             publicKey: otherGenerator.publicKey // Using a different public key
         });
-        const token = await generator.new('some-user-id');
+        const token = await generator.new({ user: 'some-user-id' });
         const result = await verifier.verify(token);
         expect(result).toBeNull();
     });

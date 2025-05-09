@@ -28,8 +28,11 @@ export async function createEphemeralTokenGenerator(opts: {
 
     // Create token
     return {
-        new: async (userId?: string) => {
-            const signed = await new SignJWT({ sub: userId })
+        new: async (d: {
+            user?: string, 
+            extras?: Record<string, unknown>
+        }) => {
+            const signed = await new SignJWT({ sub: d.user, ...d.extras })
                 .setProtectedHeader({ alg: 'EdDSA' })
                 .setIssuedAt()
                 .setNotBefore('0s')
@@ -62,9 +65,11 @@ export async function createEphemeralTokenVerifier(opts: {
                 if (payload.iss !== opts.service) {
                     return null;
                 }
+                const { iss, sub, aud, jti, nbf, exp, iat, ...extras } = payload;
                 return {
-                    userId: payload.sub ?? null,
-                    uuid: payload.jti ?? null
+                    user: sub ?? null,
+                    uuid: jti ?? null,
+                    extras: extras ?? {}
                 }
             } catch (e) {
                 return null;
