@@ -36,17 +36,19 @@ describe('ExpirableMap', () => {
         expect(map.size).toBe(0);
     });
 
-    it('allows per-entry TTL override', () => {
-        const map = new ExpirableMap<string, number>(1000); // default 1s
-        map.set('short', 1, 100);   // custom TTL 100ms
-        map.set('long', 2, 2000);   // custom TTL 2s
+    it('allows per-entry absolute expiration override', () => {
+        const map = new ExpirableMap<string, number>(1000); // default 1s relative TTL
+
+        const now = Date.now();
+        map.set('short', 1, now + 100);   // expires 100 ms from now
+        map.set('long', 2, now + 2000);   // expires 2 s from now
 
         vi.advanceTimersByTime(150);
         // 'short' expired, 'long' alive
         expect(map.get('short')).toBeUndefined();
         expect(map.get('long')).toBe(2);
 
-        vi.advanceTimersByTime(1900); // total 2050ms
+        vi.advanceTimersByTime(1900); // total 2050 ms since start
         // 'long' now expired
         expect(map.has('long')).toBe(false);
         expect([...map.entries()].length).toBe(0);

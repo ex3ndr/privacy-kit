@@ -17,7 +17,6 @@ describe('Ephemeral Token Generator', () => {
         expect(result).not.toBeNull();
         expect(result?.user).toBe('some-user-id');
         expect(result?.uuid).not.toBeNull();
-        console.log(token);
     });
 
     it('should expire after ttl', async () => {
