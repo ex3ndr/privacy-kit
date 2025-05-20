@@ -22,11 +22,9 @@ export function deriveSecretKeyTreeChild(state: KeyTreeState, index: string): Ke
 
     // Derive key
     const I = hmac_sha512(state.chainCode, data);
-    const IL = I.subarray(32);
-    const IR = I.subarray(0, 32);
     return {
-        key: IL,
-        chainCode: IR,
+        key: I.subarray(0, 32),
+        chainCode: I.subarray(32),
     };
 }
 
