@@ -1,7 +1,6 @@
 import { concatBytes } from "../formats/bytes";
 import { decodeUTF8, encodeUTF8 } from "../formats/text";
-import { deriveKey } from "../crypto/deriveKey";
-import { deriveSecureKey } from "../crypto/deriveSecureKey"
+import { deriveSecretKeyTreeChild } from "../crypto/deriveKey";
 import * as crypto from 'crypto';
 import * as tweetnacl from 'tweetnacl';
 import { hmac_sha512 } from "../crypto/hmac_sha512";
@@ -10,20 +9,10 @@ const PACKAGE_AES_BUFFER = 0;
 
 export class KeyTree {
 
-    static async create(key: string | Uint8Array | Buffer, usage: string) {
-        const derived = await deriveSecureKey({
-            key: key,
-            usage: usage
-        });
-        return new KeyTree(derived, usage);
-    }
-
     #master: Uint8Array
-    #usage: string
 
-    private constructor(master: Uint8Array, usage: string) {
+    constructor(master: Uint8Array) {
         this.#master = master;
-        this.#usage = usage;
         Object.freeze(this);
     }
 
@@ -48,7 +37,7 @@ export class KeyTree {
     // Hashing
     //
 
-    hash(path: string[], data: Uint8Array|string): Uint8Array {
+    hash(path: string[], data: Uint8Array | string): Uint8Array {
         const key = this.#deriveKey('hmac_sha512', [...path]);
         return hmac_sha512(key, data);
     }
@@ -67,9 +56,9 @@ export class KeyTree {
         return concatBytes(
             Uint8Array.from([PACKAGE_AES_BUFFER]),
             nonce,
-            authTag,
             encrypted,
-            encryptedFinal
+            encryptedFinal,
+            authTag
         );
     }
 
@@ -79,8 +68,8 @@ export class KeyTree {
         }
         const key = this.deriveSymmetricKey(path);
         const nonce = data.subarray(1, 1 + 12);
-        const authTag = data.subarray(13, 13 + 16);
-        const encrypted = data.subarray(13 + 16);
+        const encrypted = data.subarray(13, data.length - 16);
+        const authTag = data.subarray(data.length - 16, data.length);
         const cipher = crypto.createDecipheriv('aes-256-gcm', key, nonce);
         cipher.setAuthTag(authTag);
 
@@ -100,6 +89,17 @@ export class KeyTree {
                 throw new Error('Path element cannot start with #');
             }
         }
-        return deriveKey(this.#master, this.#usage, [...path, '#' + algo]);
+        let remaining = [...path, '#' + algo];
+        let state = this.#master;
+        while (true) {
+            let index = remaining[0];
+            remaining = remaining.slice(1);
+            let ch = deriveSecretKeyTreeChild(state, index);
+            if (remaining.length > 0) {
+                state = ch.chainCode;
+            } else {
+                return ch.key;
+            }
+        }
     }
 }

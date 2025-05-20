@@ -15,13 +15,13 @@ export function deriveSecretKeyTreeRoot(seed: string | Uint8Array | Buffer, usag
     };
 }
 
-export function deriveSecretKeyTreeChild(state: KeyTreeState, index: string): KeyTreeState {
+export function deriveSecretKeyTreeChild(chainCode: Uint8Array, index: string): KeyTreeState {
 
     // Prepare data
     const data = concatBytes(new Uint8Array([0x0]), encodeUTF8(index)); // prepend 0x00 for separator
 
     // Derive key
-    const I = hmac_sha512(state.chainCode, data);
+    const I = hmac_sha512(chainCode, data);
     return {
         key: I.subarray(0, 32),
         chainCode: I.subarray(32),
@@ -34,7 +34,7 @@ export function deriveKey(master: Uint8Array, usage: string, path: string[]): Ui
     while (remaining.length > 0) {
         let index = remaining[0];
         remaining = remaining.slice(1);
-        state = deriveSecretKeyTreeChild(state, index);
+        state = deriveSecretKeyTreeChild(state.chainCode, index);
     }
     return state.key;
 }
