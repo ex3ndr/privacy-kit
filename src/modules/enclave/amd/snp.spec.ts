@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { parseAttestation } from "./attestation";
+import { parseAttestation } from "./snp";
 import { decodeHex } from "../../formats/hex";
 
 describe('attestation', () => {

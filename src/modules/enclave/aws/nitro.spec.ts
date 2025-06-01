@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import { parseNitroEnclaveAttestation } from './nitro';
 
 describe('nitro', () => {

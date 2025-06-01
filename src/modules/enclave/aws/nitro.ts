@@ -1,8 +1,19 @@
-import { decodeBase64, encodeBase64 } from "../../formats/base64";
-import { decodeCBOR, encodeCBOR } from "./impl/cbor";
 import * as z from 'zod';
-import { createSignedBundle, verifyNitroChain, verifyNitroSignature } from "./impl/nitro_verify";
+import { decodeBase64 } from "../../formats/base64";
+import { decodeCBOR } from "./impl/cbor";
 import { encodeHex } from "../../formats/hex";
+import { verifyNitroChain } from "./impl/nitro_verify";
+import { createSignedBundle } from "./impl/nitro_verify";
+import { verifyNitroSignature } from "./impl/nitro_verify";
+
+export type NitroEnclaveAttestationDocument = {
+    moduleId: string
+    timestamp: number,
+    pcrs: Record<number, string>,
+    nonce: Uint8Array | null,
+    userData: Uint8Array | null,
+    publicKey: Uint8Array | null,
+}
 
 export type NitroEnclaveAttestation = {
     raw: {
@@ -10,15 +21,10 @@ export type NitroEnclaveAttestation = {
         headerUnprotected: any;
         message: Uint8Array;
         signature: Uint8Array;
+        cabundle: Uint8Array[];
+        certificate: Uint8Array;
     },
-    document: {
-        moduleId: string
-        timestamp: number,
-        pcrs: Record<number, string>,
-        nonce: Uint8Array | null,
-        userData: Uint8Array | null,
-        publicKey: Uint8Array | null,
-    }
+    document: NitroEnclaveAttestationDocument
 }
 
 //
@@ -45,6 +51,12 @@ const documentSchema = z.object({
     nonce: z.instanceof(Uint8Array).nullable(),
 });
 
+export async function parseAndVerifyNitroEnclaveAttestation(body: string): Promise<NitroEnclaveAttestationDocument> {
+    const attestation = await parseNitroEnclaveAttestation(body);
+    await verifyNitroEnclaveAttestation(attestation);
+    return attestation.document;
+}
+
 export async function parseNitroEnclaveAttestation(body: string): Promise<NitroEnclaveAttestation> {
 
     // Decode the package
@@ -70,35 +82,18 @@ export async function parseNitroEnclaveAttestation(body: string): Promise<NitroE
         throw new Error('Invalid attestation');
     }
     const attestation = d2.data;
-    
-    // Check the chain
-    const chain = [...attestation.cabundle, attestation.certificate];
-    const publicKey = await verifyNitroChain(chain);
-
-    // Check the signature
-    const signedData = createSignedBundle({
-        protectedHeader: headerProtected,
-        data: message
-    })
-    await verifyNitroSignature({
-        publicKey,
-        message: signedData,
-        signature
-    });
-
-    // Return the attestation
-
     const pcrs: Record<number, string> = {};
     for (const [key, value] of Object.entries(attestation.pcrs)) {
         pcrs[parseInt(key)] = encodeHex(value, 'mac');
     }
-
     return {
         raw: {
             headerProtected,
             headerUnprotected,
             message,
-            signature
+            signature,
+            cabundle: attestation.cabundle,
+            certificate: attestation.certificate
         },
         document: {
             moduleId: attestation.module_id,
@@ -109,4 +104,22 @@ export async function parseNitroEnclaveAttestation(body: string): Promise<NitroE
             publicKey: attestation.public_key
         }
     }
+}
+
+export async function verifyNitroEnclaveAttestation(attestation: NitroEnclaveAttestation) {
+
+    // Check the chain
+    const chain = [...attestation.raw.cabundle, attestation.raw.certificate];
+    const publicKey = await verifyNitroChain(chain);
+
+    // Check the signature
+    const signedData = createSignedBundle({
+        protectedHeader: attestation.raw.headerProtected,
+        data: attestation.raw.message
+    })
+    await verifyNitroSignature({
+        publicKey,
+        message: signedData,
+        signature: attestation.raw.signature
+    });
 }

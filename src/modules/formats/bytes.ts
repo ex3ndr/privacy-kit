@@ -63,11 +63,20 @@ export class ByteReader {
         return value;
     }
 
-    readUInt32(): number {
+    readUInt32BE(): number {
         if (this.#offset + 4 > this.#bytes.length) {
             throw new Error('EOF');
         }
         const value = decodeUInt32(this.#bytes.slice(this.#offset, this.#offset + 4));
+        this.#offset += 4;
+        return value;
+    }
+
+    readUInt32LE(): number {
+        if (this.#offset + 4 > this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        const value = decodeUInt32(this.#bytes.slice(this.#offset, this.#offset + 4).reverse());
         this.#offset += 4;
         return value;
     }

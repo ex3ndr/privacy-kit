@@ -36,15 +36,21 @@ export {
     ephemeralToken
 } from './modules/tokens/ephemeral';
 export {
-    createNitroHttpAgent,
-    fetchAttestation
-} from './modules/enclave/aws/nitroSocket';
-export {
-    parseNitroEnclaveAttestation
+    parseNitroEnclaveAttestation,
+    verifyNitroEnclaveAttestation,
+    parseAndVerifyNitroEnclaveAttestation,
 } from './modules/enclave/aws/nitro';
 export type {
+    NitroEnclaveAttestationDocument,
     NitroEnclaveAttestation
 } from './modules/enclave/aws/nitro';
+export {
+    parseSNPAttestation,
+} from './modules/enclave/amd/snp';
+export type {
+    SNPAttestationDocument,
+    SNPAttestation
+} from './modules/enclave/amd/snp';
 export {
     request
 } from './modules/requests/request';

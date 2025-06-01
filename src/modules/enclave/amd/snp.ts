@@ -1,12 +1,13 @@
+import { encodeHex } from "@/modules/formats/hex";
 import { ByteReader } from "../../formats/bytes";
 
-export type AMDAttestationVariant =
+export type SNPAttestationVariant =
     | 'v2'
     | 'v3'
     | 'v3+' // Turin
     ;
 
-export type AMDPlatformInfo = {
+export type SNPPlatformInfo = {
     smtEnabled: boolean;
     tsmeEnabled: boolean;
     eccEnabled: boolean;
@@ -15,39 +16,41 @@ export type AMDPlatformInfo = {
     aliasCheckComplete: boolean;
 }
 
-export type AMDAttestation = {
+export type SNPAttestationDocument = {
+    variant: SNPAttestationVariant;
+    guestSvn: number;
+    guestPolicy: SNPGuestPolicy;
+    familyId: Uint8Array;
+    imageId: Uint8Array;
+    measurement: Uint8Array;
+    vmpl: number;
+    sigAlgo: number;
+    reportData: Uint8Array;
+    hostData: Uint8Array;
+    idKeyDigest: Uint8Array;
+    authorKeyDigest: Uint8Array;
+    reportId: Uint8Array;
+    reportIdMa: Uint8Array;
+    currentTCB: SNPTCBVersion;
+    reportedTCB: SNPTCBVersion;
+    platformInfo: SNPPlatformInfo;
+    cpuInfo: SNPCPUInfo;
+    committedTCB: SNPTCBVersion;
+    currentVersion: SNPVersion;
+    committedVersion: SNPVersion;
+    launchTcb: SNPTCBVersion;
+    signature: SNPAttestationSignature;
+}
+
+export type SNPAttestation = {
     raw: {
         protected: Uint8Array;
         signature: Uint8Array;
     },
-    document: {
-        variant: AMDAttestationVariant;
-        guestSvn: number;
-        guestPolicy: AMDGuestPolicy;
-        familyId: Uint8Array;
-        imageId: Uint8Array;
-        measurement: Uint8Array;
-        vmpl: number;
-        sigAlgo: number;
-        reportData: Uint8Array;
-        hostData: Uint8Array;
-        idKeyDigest: Uint8Array;
-        authorKeyDigest: Uint8Array;
-        reportId: Uint8Array;
-        reportIdMa: Uint8Array;
-        currentTCB: AMDTCBVersion;
-        reportedTCB: AMDTCBVersion;
-        platformInfo: AMDPlatformInfo;
-        cpuInfo: AMDCPUInto;
-        committedTCB: AMDTCBVersion;
-        currentVersion: AMDVersion;
-        committedVersion: AMDVersion;
-        launchTcb: AMDTCBVersion;
-        signature: AMDSignature;
-    }
+    document: SNPAttestationDocument
 }
 
-export type AMDTCBVersion = {
+export type SNPTCBVersion = {
     fmc: number | null;
     bootloader: number;
     tee: number;
@@ -55,13 +58,13 @@ export type AMDTCBVersion = {
     microcode: number;
 }
 
-export type AMDVersion = {
+export type SNPVersion = {
     major: number;
     minor: number;
     patch: number;
 }
 
-export type AMDGuestPolicy = {
+export type SNPGuestPolicy = {
     abiMinor: number;
     abiMajor: number;
     smtAllowed: boolean;
@@ -74,27 +77,28 @@ export type AMDGuestPolicy = {
     ciphertextHiding: boolean;
 }
 
-export type AMDCPUInto = {
+export type SNPCPUInfo = {
     famId: number | null;
     modId: number | null;
     step: number | null;
     chipId: Uint8Array;
+    fmspc: string;
 }
 
-export type AMDSignature = {
+export type SNPAttestationSignature = {
     r: Uint8Array;
     s: Uint8Array;
 }
 
-export function parseAttestation(attestation: Uint8Array): AMDAttestation | null {
+export function parseSNPAttestation(attestation: Uint8Array): SNPAttestation | null {
     if (attestation.length !== 1184) {
         return null;
     }
     const reader = new ByteReader(attestation);
 
     // Read version
-    const version = reader.readUInt32();
-    let variant: AMDAttestationVariant;
+    const version = reader.readUInt32LE();
+    let variant: SNPAttestationVariant;
     if (version === 0 || version === 1) {
         return null
     } else if (version === 2) {
@@ -108,15 +112,15 @@ export function parseAttestation(attestation: Uint8Array): AMDAttestation | null
     }
 
     // Read fields
-    const guestSvn = reader.readUInt32();
+    const guestSvn = reader.readUInt32LE();
     const guestPolicy = readGuestPolicy(reader);
     const familyId = reader.readBytes(16);
     const imageId = reader.readBytes(16);
-    const vmpl = reader.readUInt32();
-    const sig_algo = reader.readUInt32();
+    const vmpl = reader.readUInt32LE();
+    const sig_algo = reader.readUInt32LE();
     const currentTCB = readTCBVersion(reader, variant);
     const platformInfo = readPlatformInfo(reader);
-    const keyInfo = reader.readUInt32();
+    const keyInfo = reader.readUInt32LE();
     reader.skip(4);
     const reportData = reader.readBytes(64);
     const measurement = reader.readBytes(48);
@@ -171,7 +175,7 @@ export function parseAttestation(attestation: Uint8Array): AMDAttestation | null
     }
 }
 
-function readTCBVersion(reader: ByteReader, variant: AMDAttestationVariant): AMDTCBVersion {
+function readTCBVersion(reader: ByteReader, variant: SNPAttestationVariant): SNPTCBVersion {
     const bytes = reader.readBytes(8);
     if (variant === 'v3+') {
         return {
@@ -192,7 +196,7 @@ function readTCBVersion(reader: ByteReader, variant: AMDAttestationVariant): AMD
     }
 }
 
-function readVersion(reader: ByteReader): AMDVersion {
+function readVersion(reader: ByteReader): SNPVersion {
     const bytes = reader.readBytes(3);
     return {
         major: bytes[0],
@@ -201,7 +205,7 @@ function readVersion(reader: ByteReader): AMDVersion {
     }
 }
 
-function readGuestPolicy(reader: ByteReader): AMDGuestPolicy {
+function readGuestPolicy(reader: ByteReader): SNPGuestPolicy {
     const bytes = reader.readBytes(8);
     const value = BigInt(bytes[0]) | (BigInt(bytes[1]) << 8n) | (BigInt(bytes[2]) << 16n) | (BigInt(bytes[3]) << 24n) |
         (BigInt(bytes[4]) << 32n) | (BigInt(bytes[5]) << 40n) | (BigInt(bytes[6]) << 48n) | (BigInt(bytes[7]) << 56n);
@@ -220,7 +224,7 @@ function readGuestPolicy(reader: ByteReader): AMDGuestPolicy {
     };
 }
 
-function readPlatformInfo(reader: ByteReader): AMDPlatformInfo {
+function readPlatformInfo(reader: ByteReader): SNPPlatformInfo {
     const bytes = reader.readBytes(8);
     const value = BigInt(bytes[0]) | (BigInt(bytes[1]) << 8n) | (BigInt(bytes[2]) << 16n) | (BigInt(bytes[3]) << 24n) |
         (BigInt(bytes[4]) << 32n) | (BigInt(bytes[5]) << 40n) | (BigInt(bytes[6]) << 48n) | (BigInt(bytes[7]) << 56n);
@@ -235,32 +239,37 @@ function readPlatformInfo(reader: ByteReader): AMDPlatformInfo {
     };
 }
 
-function readCPUInfo(reader: ByteReader, variant: AMDAttestationVariant): AMDCPUInto {
+function readCPUInfo(reader: ByteReader, variant: SNPAttestationVariant): SNPCPUInfo {
     if (variant === 'v2') {
         reader.skip(24);
-        const chipId = reader.readBytes(64);
+        const chipId = reader.readBytes(64).reverse();
+        const fmspc = encodeHex(chipId.slice(0, 6)).toLowerCase();
         return {
             famId: null,
             modId: null,
             step: null,
             chipId,
+            fmspc,
         }
     } else {
         const famId = reader.readByte();
         const modId = reader.readByte();
         const step = reader.readByte();
         reader.skip(21);
-        const chipId = reader.readBytes(64);
+        const chipId = reader.readBytes(64).reverse();
+        console.log(reader.offset);
+        const fmspc = encodeHex(chipId.slice(0, 6)).toLowerCase();
         return {
             famId,
             modId,
             step,
             chipId,
+            fmspc,
         }
     }
 }
 
-function readSignature(reader: ByteReader): AMDSignature {
+function readSignature(reader: ByteReader): SNPAttestationSignature {
     const r = reader.readBytes(48);
     reader.skip(24);
     const s = reader.readBytes(48);
