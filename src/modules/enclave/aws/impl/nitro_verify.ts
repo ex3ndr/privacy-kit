@@ -1,7 +1,7 @@
 import * as x509 from "@peculiar/x509";
 import { nitroCa } from "./nitro_ca";
-import { decodeBase64 } from "../../formats/base64";
-import { decodeHex } from "../../formats/hex";
+import { decodeBase64 } from "../../../formats/base64";
+import { decodeHex } from "../../../formats/hex";
 import { p384 } from '@noble/curves/p384';
 import { sha384 } from "@noble/hashes/sha2";
 import { encodeCBOR } from "./cbor";

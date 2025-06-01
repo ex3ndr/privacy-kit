@@ -1,8 +1,8 @@
-import { decodeBase64, encodeBase64 } from "../formats/base64";
+import { decodeBase64, encodeBase64 } from "../../formats/base64";
 import { decodeCBOR, encodeCBOR } from "./impl/cbor";
 import * as z from 'zod';
 import { createSignedBundle, verifyNitroChain, verifyNitroSignature } from "./impl/nitro_verify";
-import { encodeHex } from "../formats/hex";
+import { encodeHex } from "../../formats/hex";
 
 export type NitroEnclaveAttestation = {
     raw: {

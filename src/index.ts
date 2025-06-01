@@ -15,7 +15,8 @@ export {
     concatBytes,
     equalBytes,
     encodeUInt32,
-    decodeUInt32
+    decodeUInt32,
+    ByteReader
 } from './modules/formats/bytes';
 export {
     encodeBip39,
@@ -37,13 +38,13 @@ export {
 export {
     createNitroHttpAgent,
     fetchAttestation
-} from './modules/aws/nitroSocket';
+} from './modules/enclave/aws/nitroSocket';
 export {
     parseNitroEnclaveAttestation
-} from './modules/aws/nitro';
+} from './modules/enclave/aws/nitro';
 export type {
     NitroEnclaveAttestation
-} from './modules/aws/nitro';
+} from './modules/enclave/aws/nitro';
 export {
     request
 } from './modules/requests/request';

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSignedBundle, verifyNitroChain } from './nitro_verify';
-import { decodeBase64 } from '../../formats/base64';
+import { decodeBase64 } from '../../../formats/base64';
 import { decodeCBOR, encodeCBOR } from './cbor';
 
 describe('nitro_verify', () => {

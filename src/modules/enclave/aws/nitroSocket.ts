@@ -3,7 +3,7 @@ import * as tls from 'tls';
 import { randomBytes } from 'crypto';
 import { IncomingMessage } from 'http';
 import { NitroEnclaveAttestation, parseNitroEnclaveAttestation } from "./nitro";
-import { decodeHex } from "../formats/hex";
+import { decodeHex } from "../../formats/hex";
 
 export async function fetchAttestation(host: string, port: number) {
 

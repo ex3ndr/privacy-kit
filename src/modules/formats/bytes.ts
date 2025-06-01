@@ -1,3 +1,5 @@
+import { decodeUTF8 } from "./text";
+
 export function concatBytes(...arrays: Uint8Array[]): Uint8Array {
     let length = 0;
     for (const arr of arrays) {
@@ -34,4 +36,62 @@ export function encodeUInt32(value: number): Uint8Array {
 
 export function decodeUInt32(value: Uint8Array): number {
     return (value[0] << 24) | (value[1] << 16) | (value[2] << 8) | value[3];
+}
+
+//
+// Byte Reader and Writer
+//
+
+export class ByteReader {
+    #offset = 0;
+    #bytes: Uint8Array;
+
+    constructor(bytes: Uint8Array) {
+        this.#bytes = bytes;
+    }
+
+    get offset(): number {
+        return this.#offset;
+    }
+
+    readByte(): number {
+        if (this.#offset >= this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        const value = this.#bytes[this.#offset];
+        this.#offset++;
+        return value;
+    }
+
+    readUInt32(): number {
+        if (this.#offset + 4 > this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        const value = decodeUInt32(this.#bytes.slice(this.#offset, this.#offset + 4));
+        this.#offset += 4;
+        return value;
+    }
+
+    readBytes(length: number): Uint8Array {
+        if (this.#offset + length > this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        const value = this.#bytes.slice(this.#offset, this.#offset + length);
+        this.#offset += length;
+        return value;
+    }
+
+    readString(length: number): string {
+        if (this.#offset + length > this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        return decodeUTF8(this.readBytes(length));
+    }
+
+    skip(length: number): void {
+        if (this.#offset + length > this.#bytes.length) {
+            throw new Error('EOF');
+        }
+        this.#offset += length;
+    }
 }
