@@ -140,7 +140,7 @@ export function poprfServer(algo: 'ristretto255' | 'p256', secretKey: Uint8Array
 
 export async function oprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Uint8Array) {
     const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
-    const privateKey = await derivePrivateKey(Oprf.Mode.OPRF, suite, seed, cryptoProvider);
+    const privateKey = await derivePrivateKey(Oprf.Mode.OPRF, suite, seed, encodeUTF8('OPRF Derivation'), cryptoProvider);
     const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
     return {
         privateKey,
@@ -150,7 +150,7 @@ export async function oprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Uin
 
 export async function voprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Uint8Array) {
     const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
-    const privateKey = await derivePrivateKey(Oprf.Mode.VOPRF, suite, seed, cryptoProvider);
+    const privateKey = await derivePrivateKey(Oprf.Mode.VOPRF, suite, seed, encodeUTF8('VOPRF Derivation'), cryptoProvider);
     const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
     return {
         privateKey,
@@ -160,7 +160,7 @@ export async function voprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Ui
 
 export async function poprfDeriveKeyPair(algo: 'ristretto255' | 'p256', seed: Uint8Array) {
     const suite = algo === 'ristretto255' ? Oprf.Suite.RISTRETTO255_SHA512 : Oprf.Suite.P256_SHA256;
-    const privateKey = await derivePrivateKey(Oprf.Mode.POPRF, suite, seed, cryptoProvider);
+    const privateKey = await derivePrivateKey(Oprf.Mode.POPRF, suite, seed, encodeUTF8('POPRF Derivation'), cryptoProvider);
     const publicKey = generatePublicKey(suite, privateKey, cryptoProvider);
     return {
         privateKey,
