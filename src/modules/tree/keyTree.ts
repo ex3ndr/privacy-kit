@@ -17,6 +17,15 @@ export class KeyTree {
     }
 
     //
+    // Subtree
+    //
+
+    subtree(path: string[]): KeyTree {
+        const key = this.#deriveSubtreeKey(path);
+        return new KeyTree(key);
+    }
+
+    //
     // Derive keys
     //
 
@@ -99,6 +108,26 @@ export class KeyTree {
                 state = ch.chainCode;
             } else {
                 return ch.key;
+            }
+        }
+    }
+
+    #deriveSubtreeKey(path: string[]): Uint8Array {
+        for (let p of path) {
+            if (p.startsWith('#')) {
+                throw new Error('Path element cannot start with #');
+            }
+        }
+        let remaining = [...path];
+        let state = this.#master;
+        while (true) {
+            let index = remaining[0];
+            remaining = remaining.slice(1);
+            let ch = deriveSecretKeyTreeChild(state, index);
+            if (remaining.length > 0) {
+                state = ch.chainCode;
+            } else {
+                return ch.chainCode;
             }
         }
     }
