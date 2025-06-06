@@ -55,7 +55,7 @@ export class KeyTree {
     // Encryption
     //
 
-    async symmetricEncrypt(path: string[], data: Uint8Array | string): Promise<Uint8Array> {
+    symmetricEncrypt(path: string[], data: Uint8Array | string): Uint8Array {
         const key = this.deriveSymmetricKey(path);
         const nonce = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
@@ -71,7 +71,7 @@ export class KeyTree {
         );
     }
 
-    async symmetricDecryptBuffer(path: string[], data: Uint8Array): Promise<Uint8Array> {
+    symmetricDecryptBuffer(path: string[], data: Uint8Array): Uint8Array {
         if (data[0] !== PACKAGE_AES_BUFFER) {
             throw new Error('Invalid data');
         }
@@ -87,8 +87,8 @@ export class KeyTree {
         return concatBytes(decrypted, decryptedFinal);
     }
 
-    async symmetricDecryptString(path: string[], data: Uint8Array): Promise<string> {
-        const decrypted = await this.symmetricDecryptBuffer(path, data);
+    symmetricDecryptString(path: string[], data: Uint8Array): string {
+        const decrypted = this.symmetricDecryptBuffer(path, data);
         return decodeUTF8(decrypted);
     }
 
