@@ -30,7 +30,11 @@ export {
     oprfDeriveKeyPair,
     voprfDeriveKeyPair,
     oprfGenerateKeyPair,
-    voprfGenerateKeyPair
+    voprfGenerateKeyPair,
+    poprfClient,
+    poprfServer,
+    poprfDeriveKeyPair,
+    poprfGenerateKeyPair
 } from './modules/oprf/oprf';
 export {
     ephemeralToken
@@ -66,3 +70,7 @@ export {
 export {
     monotonicNow
 } from './modules/time/monotonicNow';
+export {
+    createEphemeralTokenGenerator,
+    createEphemeralTokenVerifier
+} from './modules/tokens/ephemeral';
