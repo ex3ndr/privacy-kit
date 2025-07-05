@@ -74,3 +74,7 @@ export {
     createEphemeralTokenGenerator,
     createEphemeralTokenVerifier
 } from './modules/tokens/ephemeral';
+export {
+    createPersistentTokenGenerator,
+    createPersistentTokenVerifier
+} from './modules/tokens/persistent';

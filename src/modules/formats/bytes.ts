@@ -38,6 +38,13 @@ export function decodeUInt32(value: Uint8Array): number {
     return (value[0] << 24) | (value[1] << 16) | (value[2] << 8) | value[3];
 }
 
+export function padBytes(value: Uint8Array, length: number): Uint8Array {
+    if (value.length >= length) {
+        throw new Error('Value is too long');
+    }
+    return concatBytes(value, new Uint8Array(length - value.length));
+}
+
 //
 // Byte Reader and Writer
 //
