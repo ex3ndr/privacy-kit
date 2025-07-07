@@ -31,3 +31,21 @@ export function decodeBigInt(value: Uint8Array): bigint {
     
     return result;
 }
+
+export function exportBigInt(value: bigint): Uint8Array {
+    if (value < 0n) {
+        throw new Error("Negative numbers not supported");
+    }
+    
+    // Start with the minimal encoding
+    const minimalBytes = encodeBigInt(value);
+    
+    // Create a 32-byte array with zero padding
+    const result = new Uint8Array(32);
+    
+    // Copy the minimal bytes to the end (right-aligned, big-endian)
+    const offset = 32 - minimalBytes.length;
+    result.set(minimalBytes, offset);
+    
+    return result;
+}

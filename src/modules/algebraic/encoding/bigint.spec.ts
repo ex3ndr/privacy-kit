@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodeBigInt, decodeBigInt } from './bigint';
+import { encodeBigInt, decodeBigInt, exportBigInt } from './bigint';
 
 describe('encodeBigInt', () => {
     it('should encode zero correctly', () => {
@@ -141,4 +141,114 @@ describe('encode/decode roundtrip', () => {
         // Should decode correctly again
         expect(decodeBigInt(reencoded)).toBe(256n);
     });
-}); 
+});
+
+describe('exportBigInt', () => {
+    it('should export zero as 32-byte array', () => {
+        const result = exportBigInt(0n);
+        expect(result.length).toBe(32);
+        expect(result[31]).toBe(0);
+        expect(result.every(byte => byte === 0)).toBe(true);
+    });
+
+    it('should export small numbers with proper padding', () => {
+        const result = exportBigInt(255n);
+        expect(result.length).toBe(32);
+        expect(result[31]).toBe(255);
+        expect(result[30]).toBe(0);
+        // Check that all leading bytes are zero
+        for (let i = 0; i < 31; i++) {
+            expect(result[i]).toBe(0);
+        }
+    });
+
+    it('should export larger numbers with proper padding', () => {
+        const result = exportBigInt(256n);
+        expect(result.length).toBe(32);
+        expect(result[31]).toBe(0);
+        expect(result[30]).toBe(1);
+        // Check that all leading bytes are zero
+        for (let i = 0; i < 30; i++) {
+            expect(result[i]).toBe(0);
+        }
+    });
+
+    it('should export very large numbers correctly', () => {
+        // Test with a number that takes exactly 32 bytes
+        const largeNumber = 2n ** 256n - 1n;
+        const result = exportBigInt(largeNumber);
+        expect(result.length).toBe(32);
+        expect(result[0]).toBe(255);
+        expect(result[31]).toBe(255);
+        expect(result.every(byte => byte === 255)).toBe(true);
+    });
+
+    it('should throw error for negative numbers', () => {
+        expect(() => exportBigInt(-1n)).toThrow("Negative numbers not supported");
+        expect(() => exportBigInt(-255n)).toThrow("Negative numbers not supported");
+    });
+
+    it('should handle edge cases', () => {
+        // Test with 1
+        const result1 = exportBigInt(1n);
+        expect(result1.length).toBe(32);
+        expect(result1[31]).toBe(1);
+        for (let i = 0; i < 31; i++) {
+            expect(result1[i]).toBe(0);
+        }
+
+        // Test with max value for one byte
+        const result2 = exportBigInt(255n);
+        expect(result2.length).toBe(32);
+        expect(result2[31]).toBe(255);
+        for (let i = 0; i < 31; i++) {
+            expect(result2[i]).toBe(0);
+        }
+    });
+
+    it('should be compatible with decodeBigInt', () => {
+        const testValues = [0n, 1n, 255n, 256n, 65535n, 65536n, 2n ** 64n - 1n, 2n ** 128n - 1n];
+        
+        for (const value of testValues) {
+            const exported = exportBigInt(value);
+            const decoded = decodeBigInt(exported);
+            expect(decoded).toBe(value);
+        }
+    });
+
+    it('should handle numbers that require different byte lengths', () => {
+        // Test numbers that would normally require 1, 2, 4, 8, 16, 32 bytes
+        const testCases = [
+            { value: 0xffn, expectedLastByte: 0xff },
+            { value: 0xffffn, expectedSecondLastByte: 0xff, expectedLastByte: 0xff },
+            { value: 0xffffffffn, expectedAt: 28, expectedValue: 0xff },
+            { value: 2n ** 64n - 1n, expectedAt: 24, expectedValue: 0xff },
+            { value: 2n ** 128n - 1n, expectedAt: 16, expectedValue: 0xff },
+        ];
+
+        for (const testCase of testCases) {
+            const result = exportBigInt(testCase.value);
+            expect(result.length).toBe(32);
+            expect(result[31]).toBe(testCase.expectedLastByte || 0xff);
+            
+            if (testCase.expectedSecondLastByte !== undefined) {
+                expect(result[30]).toBe(testCase.expectedSecondLastByte);
+            }
+            
+            if (testCase.expectedAt !== undefined) {
+                expect(result[testCase.expectedAt]).toBe(testCase.expectedValue);
+            }
+        }
+    });
+
+    it('should produce consistent results', () => {
+        // Same input should always produce same output
+        const value = 12345n;
+        const result1 = exportBigInt(value);
+        const result2 = exportBigInt(value);
+        
+        expect(result1).toEqual(result2);
+        expect(result1.length).toBe(32);
+        expect(result2.length).toBe(32);
+    });
+});
