@@ -56,4 +56,8 @@ export class Point {
     toBytes() {
         return this.#point.toRawBytes();
     }
+
+    equals(other: Point) {
+        return this.#point.equals(other.#point);
+    }
 }
