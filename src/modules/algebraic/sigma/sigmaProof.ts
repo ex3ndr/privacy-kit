@@ -186,8 +186,8 @@ function generateChallenge<TScalars extends string, TPoints extends string>(opts
         addToTranscript(protocol.descriptor) // Use binary descriptor instead of normalized statements
     ];
 
-    // Add public variables to transcript (already sorted by protocol.points)
-    for (const pointName of protocol.points.sort()) {
+    // Add public variables to transcript (in order of appearance)
+    for (const pointName of protocol.points) {
         const point = publicVariables[pointName as TPoints];
         if (!point) {
             throw new Error(`Missing public variable: ${pointName}`);
@@ -195,8 +195,8 @@ function generateChallenge<TScalars extends string, TPoints extends string>(opts
         transcriptParts.push(addToTranscript(point.toBytes()));
     }
 
-    // Add commitments to transcript (already sorted by protocol.scalars)
-    for (const scalarName of protocol.scalars.sort()) {
+    // Add commitments to transcript (in order of appearance)
+    for (const scalarName of protocol.scalars) {
         const commitment = commitments[scalarName as TScalars];
         if (!commitment) {
             throw new Error(`Missing commitment: ${scalarName}`);

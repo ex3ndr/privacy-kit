@@ -227,24 +227,26 @@ describe('Sigma Statement Definition', () => {
       expect(protocol.descriptor.length).toBeGreaterThan(0);
       
       // Binary descriptor structure for this protocol:
+      // Points order of appearance: P, G, H, Q (index 0, 1, 2, 3)
+      // Scalars order of appearance: a, b, c (index 0, 1, 2)
       // [2] - number of statements
       // Statement 1: P = G^a + H^b
-      // [2] - index of P in sorted points (G, H, P, Q)
+      // [0] - index of P in points array
       // [2] - number of terms on right
-      // [0, 0] - G (index 0) ^ a (index 0)
-      // [1, 1] - H (index 1) ^ b (index 1)
+      // [1, 0] - G (index 1) ^ a (index 0)
+      // [2, 1] - H (index 2) ^ b (index 1)
       // Statement 2: Q = G^c
-      // [3] - index of Q in sorted points
+      // [3] - index of Q in points array
       // [1] - number of terms
-      // [0, 2] - G (index 0) ^ c (index 2)
+      // [1, 2] - G (index 1) ^ c (index 2)
       
       const expectedDescriptor = new Uint8Array([
         2,          // 2 statements
-        2, 2,       // P (index 2), 2 terms
-        0, 0,       // G^a
-        1, 1,       // H^b
+        0, 2,       // P (index 0), 2 terms
+        1, 0,       // G^a
+        2, 1,       // H^b
         3, 1,       // Q (index 3), 1 term
-        0, 2        // G^c
+        1, 2        // G^c
       ]);
       
       expect(protocol.descriptor).toEqual(expectedDescriptor);
@@ -257,25 +259,49 @@ describe('Sigma Statement Definition', () => {
       expect(protocol1.descriptor).toEqual(protocol2.descriptor);
     });
 
+    it('should preserve order of appearance for variables', () => {
+      // Test that variable order is preserved
+      const protocol = sigmaProtocol('P = G^a + H^b', 'Q = H^c + G^d');
+      
+      // Points should be in order of first appearance
+      expect(protocol.points).toEqual(['P', 'G', 'H', 'Q']);
+      
+      // Scalars should be in order of first appearance
+      expect(protocol.scalars).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('should produce different descriptors for structurally different protocols', () => {
+      // These are actually different protocols (not just different naming)
+      const protocol1 = sigmaProtocol('P = G^a + H^b');
+      const protocol2 = sigmaProtocol('P = G^a + G^b'); // Using G twice instead of G and H
+      
+      // Different points used
+      expect(protocol1.points).toEqual(['P', 'G', 'H']);
+      expect(protocol2.points).toEqual(['P', 'G']);
+      
+      // Descriptors should be different
+      expect(protocol1.descriptor).not.toEqual(protocol2.descriptor);
+    });
+
     it('should handle complex protocols with many terms', () => {
       const protocol = sigmaProtocol(
         'R = P^x + Q^y + G^z + H^w',
         'S = R^v + P^u'
       );
       
-      // Points sorted: G, H, P, Q, R, S
-      // Scalars sorted: u, v, w, x, y, z
+      // Points order of appearance: R, P, Q, G, H, S (index 0, 1, 2, 3, 4, 5)
+      // Scalars order of appearance: x, y, z, w, v, u (index 0, 1, 2, 3, 4, 5)
       
       const expectedDescriptor = new Uint8Array([
         2,                // 2 statements
-        4, 4,             // R (index 4), 4 terms
-        2, 3,             // P^x (P=2, x=3)
-        3, 4,             // Q^y (Q=3, y=4)
-        0, 5,             // G^z (G=0, z=5)
-        1, 2,             // H^w (H=1, w=2)
+        0, 4,             // R (index 0), 4 terms
+        1, 0,             // P^x (P=1, x=0)
+        2, 1,             // Q^y (Q=2, y=1)
+        3, 2,             // G^z (G=3, z=2)
+        4, 3,             // H^w (H=4, w=3)
         5, 2,             // S (index 5), 2 terms
-        4, 1,             // R^v (R=4, v=1)
-        2, 0              // P^u (P=2, u=0)
+        0, 4,             // R^v (R=0, v=4)
+        1, 5              // P^u (P=1, u=5)
       ]);
       
       expect(protocol.descriptor).toEqual(expectedDescriptor);

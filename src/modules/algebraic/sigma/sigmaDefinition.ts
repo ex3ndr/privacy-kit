@@ -289,19 +289,16 @@ function createBinaryDescriptor(
     points: string[],
     scalars: string[]
 ): Uint8Array {
-    // Sort points and scalars by name
-    const sortedPoints = [...points].sort();
-    const sortedScalars = [...scalars].sort();
-
-    // Create index maps
+    // Use the order as provided (no sorting)
+    // Create index maps based on order of appearance
     const pointIndexMap = new Map<string, number>();
     const scalarIndexMap = new Map<string, number>();
 
-    sortedPoints.forEach((point, index) => {
+    points.forEach((point, index) => {
         pointIndexMap.set(point, index);
     });
 
-    sortedScalars.forEach((scalar, index) => {
+    scalars.forEach((scalar, index) => {
         scalarIndexMap.set(scalar, index);
     });
 
@@ -350,16 +347,38 @@ export function sigmaProtocol<T extends readonly string[]>(
     const stmts = statements.map(stmt => statement(stmt));
 
     // Merge all scalars and points from all statements
-    const allScalars = new Set<string>();
-    const allPoints = new Set<string>();
+    // Preserve order of first appearance
+    const allScalars: string[] = [];
+    const allPoints: string[] = [];
+    const seenScalars = new Set<string>();
+    const seenPoints = new Set<string>();
 
     for (const stmt of stmts) {
-        stmt.scalars.forEach(scalar => allScalars.add(scalar));
-        stmt.points.forEach(point => allPoints.add(point));
+        // Add points in order they appear (left side first)
+        if (!seenPoints.has(stmt.parsed.left)) {
+            allPoints.push(stmt.parsed.left);
+            seenPoints.add(stmt.parsed.left);
+        }
+        
+        // Add points from terms in order
+        for (const term of stmt.parsed.terms) {
+            if (!seenPoints.has(term.pointName)) {
+                allPoints.push(term.pointName);
+                seenPoints.add(term.pointName);
+            }
+        }
+        
+        // Add scalars in order they appear in terms
+        for (const term of stmt.parsed.terms) {
+            if (!seenScalars.has(term.scalarName)) {
+                allScalars.push(term.scalarName);
+                seenScalars.add(term.scalarName);
+            }
+        }
     }
 
-    const scalarsArray = Array.from(allScalars) as MergeScalars<T>[];
-    const pointsArray = Array.from(allPoints) as MergePoints<T>[];
+    const scalarsArray = allScalars as MergeScalars<T>[];
+    const pointsArray = allPoints as MergePoints<T>[];
 
     // Create binary descriptor
     const descriptor = createBinaryDescriptor(stmts, pointsArray, scalarsArray);
