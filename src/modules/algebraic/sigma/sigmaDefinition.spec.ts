@@ -220,6 +220,67 @@ describe('Sigma Statement Definition', () => {
       expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q']));
     });
 
+    it('should create binary descriptor', () => {
+      const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
+      
+      expect(protocol.descriptor).toBeInstanceOf(Uint8Array);
+      expect(protocol.descriptor.length).toBeGreaterThan(0);
+      
+      // Binary descriptor structure for this protocol:
+      // [2] - number of statements
+      // Statement 1: P = G^a + H^b
+      // [2] - index of P in sorted points (G, H, P, Q)
+      // [2] - number of terms on right
+      // [0, 0] - G (index 0) ^ a (index 0)
+      // [1, 1] - H (index 1) ^ b (index 1)
+      // Statement 2: Q = G^c
+      // [3] - index of Q in sorted points
+      // [1] - number of terms
+      // [0, 2] - G (index 0) ^ c (index 2)
+      
+      const expectedDescriptor = new Uint8Array([
+        2,          // 2 statements
+        2, 2,       // P (index 2), 2 terms
+        0, 0,       // G^a
+        1, 1,       // H^b
+        3, 1,       // Q (index 3), 1 term
+        0, 2        // G^c
+      ]);
+      
+      expect(protocol.descriptor).toEqual(expectedDescriptor);
+    });
+
+    it('should create consistent binary descriptors for same protocol', () => {
+      const protocol1 = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
+      const protocol2 = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
+      
+      expect(protocol1.descriptor).toEqual(protocol2.descriptor);
+    });
+
+    it('should handle complex protocols with many terms', () => {
+      const protocol = sigmaProtocol(
+        'R = P^x + Q^y + G^z + H^w',
+        'S = R^v + P^u'
+      );
+      
+      // Points sorted: G, H, P, Q, R, S
+      // Scalars sorted: u, v, w, x, y, z
+      
+      const expectedDescriptor = new Uint8Array([
+        2,                // 2 statements
+        4, 4,             // R (index 4), 4 terms
+        2, 3,             // P^x (P=2, x=3)
+        3, 4,             // Q^y (Q=3, y=4)
+        0, 5,             // G^z (G=0, z=5)
+        1, 2,             // H^w (H=1, w=2)
+        5, 2,             // S (index 5), 2 terms
+        4, 1,             // R^v (R=4, v=1)
+        2, 0              // P^u (P=2, u=0)
+      ]);
+      
+      expect(protocol.descriptor).toEqual(expectedDescriptor);
+    });
+
     it('should maintain type safety for multiple statements', () => {
       const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
       

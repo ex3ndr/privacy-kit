@@ -1,6 +1,6 @@
 import { concatBytes } from "../formats/bytes";
 import { encodeUTF8 } from "../formats/text";
-import { decodeBigInt, encodeBigInt } from "./encoding/bigint";
+import { decodeBigInt, encodeBigInt, exportBigInt } from "./encoding/bigint";
 import { Point } from "./math/point";
 import { deriveScalar, generateRandomScalar } from "./math/scalar";
 
@@ -60,10 +60,10 @@ export function createAlgebraicTokenRequest(
 
     return {
         commitment: commitmentPoint.toBytes(),
-        proof: concatBytes(blindingCommitment.toBytes(), encodeBigInt(proofScalar)),
+        proof: concatBytes(blindingCommitment.toBytes(), exportBigInt(proofScalar)),
         blindedAnonID: blindedAnonID.toBytes(),
-        blindA: encodeBigInt(blindA),
-        blindB: encodeBigInt(blindB),
+        blindA: exportBigInt(blindA),
+        blindB: exportBigInt(blindB),
     }
 }
 

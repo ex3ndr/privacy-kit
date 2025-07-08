@@ -49,3 +49,12 @@ export function exportBigInt(value: bigint): Uint8Array {
     
     return result;
 }
+
+export function importBigInt(value: Uint8Array): bigint {
+    if (value.length !== 32) {
+        throw new Error("importBigInt expects exactly 32 bytes");
+    }
+    
+    // Convert the 32-byte array to bigint (big-endian)
+    return decodeBigInt(value);
+}

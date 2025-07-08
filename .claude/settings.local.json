@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npm test:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(yarn build)",
+      "Bash(yarn test)",
+      "Bash(yarn test:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

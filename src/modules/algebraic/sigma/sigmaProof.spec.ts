@@ -274,13 +274,13 @@ describe('Sigma Proof', () => {
                 usage: 'test_proof'
             });
 
-            // Missing public variable H - this will cause challenge verification to fail first
+            // Missing public variable H
             const publicVariables = { P, G } as any;
             const result = verifySigmaProof(proof, publicVariables, protocol, nonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
-            // The challenge verification fails first because the transcript is different
-            expect(result.error).toBe('Challenge verification failed');
+            // With the new implementation, missing variables are caught immediately
+            expect(result.error).toBe('Verification error: Error: Missing public variable: H');
         });
 
         it('should reject proof with different nonce', () => {
@@ -542,6 +542,92 @@ describe('Sigma Proof', () => {
             expect(verifySigmaProof(proof1, publicVariables, protocol, nonce, 'test_usage').isValid).toBe(true);
             expect(verifySigmaProof(proof2, publicVariables, protocol, nonce, 'TEST_USAGE').isValid).toBe(true);
             expect(verifySigmaProof(proof3, publicVariables, protocol, nonce, 'test usage').isValid).toBe(true);
+        });
+
+        it('should use binary descriptor instead of normalized statements', () => {
+            // Create two protocols with same logical content but different formatting
+            const protocol1 = sigmaProtocol('P = G^a + H^b');
+            const protocol2 = sigmaProtocol('P=G^a+H^b'); // No spaces
+            
+            // Binary descriptors should be identical since the logical structure is the same
+            expect(protocol1.descriptor).toEqual(protocol2.descriptor);
+            
+            // Generate test values
+            const a = generateRandomScalar();
+            const b = generateRandomScalar();
+            const G = Point.fromHash('generator_G', 'test_domain');
+            const H = Point.fromHash('generator_H', 'test_domain');
+            const P = G.multiply(a).add(H.multiply(b));
+            
+            const nonce = encodeUTF8('test_nonce_descriptor');
+            const usage = 'test_descriptor';
+            
+            // Create proofs for both protocols
+            const proof1 = createSigmaProof({
+                protocol: protocol1,
+                variables: { P, G, H, a, b },
+                nonce,
+                usage
+            });
+            
+            const proof2 = createSigmaProof({
+                protocol: protocol2,
+                variables: { P, G, H, a, b },
+                nonce,
+                usage
+            });
+            
+            // Since descriptors are identical, both proofs should verify with either protocol
+            expect(verifySigmaProof(proof1, { P, G, H }, protocol1, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(proof2, { P, G, H }, protocol2, nonce, usage).isValid).toBe(true);
+            
+            // Cross-verify: since protocols have same descriptor, they should be interchangeable
+            expect(verifySigmaProof(proof1, { P, G, H }, protocol2, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(proof2, { P, G, H }, protocol1, nonce, usage).isValid).toBe(true);
+        });
+
+        it('should produce different descriptors for different term ordering', () => {
+            // Create two protocols with same variables but different ordering
+            const protocol1 = sigmaProtocol('P = G^a + H^b');
+            const protocol2 = sigmaProtocol('P = H^b + G^a'); // Different order
+            
+            // Binary descriptors should be different since term order matters
+            expect(protocol1.descriptor).not.toEqual(protocol2.descriptor);
+            
+            // Generate test values
+            const a = generateRandomScalar();
+            const b = generateRandomScalar();
+            const G = Point.fromHash('generator_G', 'test_domain');
+            const H = Point.fromHash('generator_H', 'test_domain');
+            const P = G.multiply(a).add(H.multiply(b));
+            
+            const nonce = encodeUTF8('test_nonce_ordering');
+            const usage = 'test_ordering';
+            
+            // Create proofs for both protocols
+            const proof1 = createSigmaProof({
+                protocol: protocol1,
+                variables: { P, G, H, a, b },
+                nonce,
+                usage
+            });
+            
+            const proof2 = createSigmaProof({
+                protocol: protocol2,
+                variables: { P, G, H, a, b },
+                nonce,
+                usage
+            });
+            
+            // Since descriptors are different, challenges should be different
+            expect(proof1.challenge).not.toEqual(proof2.challenge);
+            
+            // Each proof should verify with its own protocol
+            expect(verifySigmaProof(proof1, { P, G, H }, protocol1, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(proof2, { P, G, H }, protocol2, nonce, usage).isValid).toBe(true);
+            
+            // But not with the other protocol
+            expect(verifySigmaProof(proof1, { P, G, H }, protocol2, nonce, usage).isValid).toBe(false);
         });
 
         it('should demonstrate statement normalization protection', () => {

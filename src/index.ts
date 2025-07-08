@@ -62,6 +62,9 @@ export {
     safeCrypto as crypto
 } from './modules/crypto/_safe';
 export {
+    randomBytes
+} from './modules/crypto/randomKey';
+export {
     KeyTree
 } from './modules/tree/keyTree';
 export {

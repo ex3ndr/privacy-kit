@@ -25,3 +25,17 @@ export function randomKey(prefix: string, length: number = 24): string {
         return `${prefix}_${base64String}`;
     }
 }
+
+/**
+ * Generates cryptographically secure random bytes.
+ * 
+ * @param {number} length - The number of bytes to generate
+ * @returns {Uint8Array} A Uint8Array containing random bytes
+ * 
+ * @example
+ * const bytes = randomBytes(32);
+ * console.log(bytes);
+ */
+export function randomBytes(length: number): Uint8Array {
+    return new Uint8Array(crypto.randomBytes(length));
+}

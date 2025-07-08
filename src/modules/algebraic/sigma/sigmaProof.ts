@@ -180,38 +180,28 @@ function generateChallenge<TScalars extends string, TPoints extends string>(opts
     const { protocol, commitments, nonce, usage, publicVariables } = opts;
 
     // Build transcript for Fiat-Shamir with length prefixing
-    // Only normalize statements to prevent formatting malleability
-    const normalizeStatement = (str: string) => str.replace(/\s+/g, '').toLowerCase();
-
     const transcriptParts: Uint8Array[] = [
-        addToTranscript(encodeUTF8(usage)), // Usage is NOT normalized - it provides domain separation
-        addToTranscript(nonce)
+        addToTranscript(encodeUTF8(usage)), // Usage provides domain separation
+        addToTranscript(nonce),
+        addToTranscript(protocol.descriptor) // Use binary descriptor instead of normalized statements
     ];
 
-    // Add protocol statements to transcript (deterministic order)
-    // Normalize statements to prevent malleability from whitespace/case differences
-    const sortedStatements = [...protocol.statements]
-        .map(stmt => ({ ...stmt, normalized: normalizeStatement(stmt.statement) }))
-        .sort((a, b) => a.normalized.localeCompare(b.normalized));
-
-    for (const statement of sortedStatements) {
-        transcriptParts.push(addToTranscript(encodeUTF8(statement.normalized)));
+    // Add public variables to transcript (already sorted by protocol.points)
+    for (const pointName of protocol.points.sort()) {
+        const point = publicVariables[pointName as TPoints];
+        if (!point) {
+            throw new Error(`Missing public variable: ${pointName}`);
+        }
+        transcriptParts.push(addToTranscript(point.toBytes()));
     }
 
-    // Add public variables to transcript (deterministic order)
-    // Variable names are NOT normalized - they are part of the protocol definition
-    const sortedPublicKeys = Object.keys(publicVariables).sort();
-    for (const key of sortedPublicKeys) {
-        transcriptParts.push(addToTranscript(encodeUTF8(key)));
-        transcriptParts.push(addToTranscript(publicVariables[key as TPoints].toBytes()));
-    }
-
-    // Add commitments to transcript (deterministic order)
-    // Commitment variable names are NOT normalized
-    const sortedCommitmentKeys = Object.keys(commitments).sort();
-    for (const key of sortedCommitmentKeys) {
-        transcriptParts.push(addToTranscript(encodeUTF8(key)));
-        transcriptParts.push(addToTranscript(commitments[key as TScalars].toBytes()));
+    // Add commitments to transcript (already sorted by protocol.scalars)
+    for (const scalarName of protocol.scalars.sort()) {
+        const commitment = commitments[scalarName as TScalars];
+        if (!commitment) {
+            throw new Error(`Missing commitment: ${scalarName}`);
+        }
+        transcriptParts.push(addToTranscript(commitment.toBytes()));
     }
 
     // Derive challenge from transcript
