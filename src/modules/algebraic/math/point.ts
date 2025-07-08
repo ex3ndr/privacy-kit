@@ -9,6 +9,7 @@ export class Point {
 
     static ORDER = ed25519.CURVE.n;
     static ZERO = new Point(RistrettoPoint.ZERO);
+    static BASE = new Point(RistrettoPoint.BASE);
 
     static add(...points: Point[]) {
         let r = points[0];

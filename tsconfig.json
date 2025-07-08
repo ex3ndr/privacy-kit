@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "CommonJS",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "lib": [
       "es2020",
+      "es2022",
       "dom"
     ],
     "rootDir": "src",

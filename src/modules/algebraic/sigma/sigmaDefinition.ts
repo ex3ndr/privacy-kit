@@ -36,17 +36,28 @@ type ExtractAllVariables<T extends string> =
 type Trim<T extends string> = T extends ` ${infer R}` ? Trim<R> : T extends `${infer L} ` ? Trim<L> : T;
 
 // Extract scalars and points separately for better type safety
-type ExtractScalars<T extends string> = T extends `${infer Left}=${infer Right}`
+export type ExtractScalars<T extends string> = T extends `${infer Left}=${infer Right}`
     ? ExtractScalarsFromExpression<Trim<Right>>
     : T extends `${infer Left} = ${infer Right}`
     ? ExtractScalarsFromExpression<Trim<Right>>
     : never;
 
-type ExtractPoints<T extends string> = T extends `${infer Left}=${infer Right}`
+// Extract all points (both commitments and generators)
+type ExtractAllPoints<T extends string> = T extends `${infer Left}=${infer Right}`
     ? Trim<Left> | ExtractPointsFromExpression<Trim<Right>>
     : T extends `${infer Left} = ${infer Right}`
     ? Trim<Left> | ExtractPointsFromExpression<Trim<Right>>
     : never;
+
+// Extract only generator points (right side, excluding G)
+export type ExtractGeneratorPoints<T extends string> = T extends `${infer Left}=${infer Right}`
+    ? Exclude<ExtractPointsFromExpression<Trim<Right>>, 'G'>
+    : T extends `${infer Left} = ${infer Right}`
+    ? Exclude<ExtractPointsFromExpression<Trim<Right>>, 'G'>
+    : never;
+
+// For backward compatibility
+type ExtractPoints<T extends string> = ExtractAllPoints<T>;
 
 type ExtractScalarsFromExpression<T extends string> =
     T extends `${infer Point}^${infer Scalar}+${infer Rest}`
@@ -71,8 +82,9 @@ type ScalarRecord<T extends string> = {
     [K in ExtractScalars<T>]: bigint;
 };
 
+// Exclude G from points since it's implicit
 type PointRecord<T extends string> = {
-    [K in ExtractPoints<T>]: Point;
+    [K in Exclude<ExtractPoints<T>, 'G'>]: Point;
 };
 
 export type VariableRecord<T extends string> = ScalarRecord<T> & PointRecord<T>;
@@ -221,7 +233,14 @@ export function evaluateStatement<T extends string>(
 
     for (const term of parsed.terms) {
         const scalar = variables[term.scalarName as keyof VariableRecord<T>] as bigint;
-        const point = variables[term.pointName as keyof VariableRecord<T>] as Point;
+        let point: Point;
+        
+        // Handle G specially since it's implicit
+        if (term.pointName === 'G') {
+            point = Point.BASE;
+        } else {
+            point = variables[term.pointName as keyof VariableRecord<T>] as Point;
+        }
 
         // Handle zero scalar case - multiplying by zero gives the identity point
         if (scalar === 0n) {
@@ -239,7 +258,13 @@ export function evaluateStatement<T extends string>(
 }
 
 // Types for merging multiple statements
-type MergeScalars<T extends readonly string[]> = T extends readonly [infer First, ...infer Rest]
+export type MergeScalars<T extends readonly string[]> = T extends readonly []
+    ? never
+    : T extends readonly [infer First]
+    ? First extends string
+    ? ExtractScalars<First>
+    : never
+    : T extends readonly [infer First, ...infer Rest]
     ? First extends string
     ? Rest extends readonly string[]
     ? ExtractScalars<First> | MergeScalars<Rest>
@@ -247,11 +272,41 @@ type MergeScalars<T extends readonly string[]> = T extends readonly [infer First
     : never
     : never;
 
+// Merge all points (for backward compatibility)
 type MergePoints<T extends readonly string[]> = T extends readonly [infer First, ...infer Rest]
     ? First extends string
     ? Rest extends readonly string[]
-    ? ExtractPoints<First> | MergePoints<Rest>
-    : ExtractPoints<First>
+    ? Exclude<ExtractPoints<First>, 'G'> | MergePoints<Rest>
+    : Exclude<ExtractPoints<First>, 'G'>
+    : never
+    : never;
+
+// Helper to collect all commitments from statements
+type CollectCommitments<T extends readonly string[], Acc extends string = never> = 
+    T extends readonly [infer First, ...infer Rest]
+    ? First extends string
+    ? Rest extends readonly string[]
+    ? CollectCommitments<Rest, Acc | ExtractCommitmentPoint<First>>
+    : Acc | ExtractCommitmentPoint<First>
+    : never
+    : Acc;
+
+// Merge only generator points (right side, excluding G and excluding commitments)
+export type MergeGeneratorPoints<T extends readonly string[]> = 
+    Exclude<MergeGeneratorPointsRaw<T>, CollectCommitments<T>>;
+
+// Raw merge without excluding commitments
+type MergeGeneratorPointsRaw<T extends readonly string[]> = T extends readonly []
+    ? never
+    : T extends readonly [infer First]
+    ? First extends string
+    ? ExtractGeneratorPoints<First>
+    : never
+    : T extends readonly [infer First, ...infer Rest]
+    ? First extends string
+    ? Rest extends readonly string[]
+    ? ExtractGeneratorPoints<First> | MergeGeneratorPointsRaw<Rest>
+    : ExtractGeneratorPoints<First>
     : never
     : never;
 
@@ -261,25 +316,62 @@ type MergedVariableRecord<T extends readonly string[]> = {
     [K in MergePoints<T>]: Point;
 };
 
+// Extract commitment points (left side) from a statement
+export type ExtractCommitmentPoint<T extends string> = T extends `${infer Left}=${infer Right}`
+    ? Trim<Left>
+    : T extends `${infer Left} = ${infer Right}`
+    ? Trim<Left>
+    : never;
+
+// Types for merging commitments from multiple statements
+export type MergeCommitments<T extends readonly string[]> = T extends readonly []
+    ? never
+    : T extends readonly [infer First]
+    ? First extends string
+    ? ExtractCommitmentPoint<First>
+    : never
+    : T extends readonly [infer First, ...infer Rest]
+    ? First extends string
+    ? Rest extends readonly string[]
+    ? ExtractCommitmentPoint<First> | MergeCommitments<Rest>
+    : ExtractCommitmentPoint<First>
+    : never
+    : never;
+
 // Extract scalar types from a SigmaProtocol
-export type ExtractProtocolScalars<T> = T extends SigmaProtocol<infer S, any> ? S : never;
+export type ExtractProtocolScalars<T> = T extends SigmaProtocol<infer S, any, any> ? S : never;
 
 // Extract point types from a SigmaProtocol
-export type ExtractProtocolPoints<T> = T extends SigmaProtocol<any, infer P> ? P : never;
+export type ExtractProtocolPoints<T> = T extends SigmaProtocol<any, infer P, any> ? P : never;
 
-// Extract complete variable record from a SigmaProtocol
-export type ProtocolVariables<T extends SigmaProtocol<any, any>> = T extends SigmaProtocol<infer S, infer P>
+// Extract commitment types from a SigmaProtocol
+export type ExtractProtocolCommitments<T> = T extends SigmaProtocol<any, any, infer C> ? C : never;
+
+// Extract complete variable record from a SigmaProtocol (all variables)
+export type ProtocolVariables<T extends SigmaProtocol<any, any, any>> = T extends SigmaProtocol<infer S, infer P, infer C>
+    ? { [K in S]: bigint } & { [K in P | C]: Point }
+    : never;
+
+// Extract only input variables needed for proof creation (scalars and points)
+export type ProtocolInputVariables<T extends SigmaProtocol<any, any, any>> = T extends SigmaProtocol<infer S, infer P, any>
     ? { [K in S]: bigint } & { [K in P]: Point }
     : never;
 
-// Sigma protocol type with inferred scalar and point types
+// Extract variables needed for verification (points and commitments)
+export type ProtocolVerificationVariables<T extends SigmaProtocol<any, any, any>> = T extends SigmaProtocol<any, infer P, infer C>
+    ? { [K in P | C]: Point }
+    : never;
+
+// Sigma protocol type with inferred scalar, point, and commitment types
 export type SigmaProtocol<
     TScalars extends string = string,
-    TPoints extends string = string
+    TPoints extends string = string,
+    TCommitments extends string = string
 > = {
     statements: Statement<string>[];
     scalars: TScalars[];
-    points: TPoints[];
+    points: TPoints[]; // Generator points (right side)
+    commitments: TCommitments[]; // Result points (left side)
     descriptor: Uint8Array;
 };
 
@@ -294,8 +386,9 @@ function createBinaryDescriptor(
     const pointIndexMap = new Map<string, number>();
     const scalarIndexMap = new Map<string, number>();
 
+    // Map points to indices, offsetting by 1 since G is always at index 0
     points.forEach((point, index) => {
-        pointIndexMap.set(point, index);
+        pointIndexMap.set(point, index + 1);
     });
 
     scalars.forEach((scalar, index) => {
@@ -322,12 +415,20 @@ function createBinaryDescriptor(
 
         // For each term: pair of point and scalar indices
         for (const term of stmt.parsed.terms) {
-            const pointIndex = pointIndexMap.get(term.pointName);
-            const scalarIndex = scalarIndexMap.get(term.scalarName);
-
-            if (pointIndex === undefined) {
-                throw new Error(`Point ${term.pointName} not found`);
+            let pointIndex: number;
+            
+            // G is always at index 0
+            if (term.pointName === 'G') {
+                pointIndex = 0;
+            } else {
+                const idx = pointIndexMap.get(term.pointName);
+                if (idx === undefined) {
+                    throw new Error(`Point ${term.pointName} not found`);
+                }
+                pointIndex = idx;
             }
+            
+            const scalarIndex = scalarIndexMap.get(term.scalarName);
             if (scalarIndex === undefined) {
                 throw new Error(`Scalar ${term.scalarName} not found`);
             }
@@ -343,26 +444,36 @@ function createBinaryDescriptor(
 // Helper function to create a sigma protocol with multiple statements
 export function sigmaProtocol<T extends readonly string[]>(
     ...statements: T
-): SigmaProtocol<MergeScalars<T>, MergePoints<T>> {
+): SigmaProtocol<MergeScalars<T>, MergeGeneratorPoints<T>, MergeCommitments<T>> {
     const stmts = statements.map(stmt => statement(stmt));
+    
+    // Validate statements
+    validateStatements(stmts);
 
-    // Merge all scalars and points from all statements
+    // Merge all scalars, points, and commitments from all statements
     // Preserve order of first appearance
     const allScalars: string[] = [];
     const allPoints: string[] = [];
+    const allCommitments: string[] = [];
     const seenScalars = new Set<string>();
     const seenPoints = new Set<string>();
+    const seenCommitments = new Set<string>();
 
     for (const stmt of stmts) {
-        // Add points in order they appear (left side first)
-        if (!seenPoints.has(stmt.parsed.left)) {
-            allPoints.push(stmt.parsed.left);
-            seenPoints.add(stmt.parsed.left);
+        // Add commitment (left side) if not seen
+        if (!seenCommitments.has(stmt.parsed.left)) {
+            allCommitments.push(stmt.parsed.left);
+            seenCommitments.add(stmt.parsed.left);
         }
         
-        // Add points from terms in order
+        // Add points from terms in order (these are the generators)
+        // But skip points that are already commitments from previous statements
         for (const term of stmt.parsed.terms) {
-            if (!seenPoints.has(term.pointName)) {
+            // Skip G as it's implicit and always available
+            // Skip points that are already commitments
+            if (term.pointName !== 'G' && 
+                !seenPoints.has(term.pointName) && 
+                !seenCommitments.has(term.pointName)) {
                 allPoints.push(term.pointName);
                 seenPoints.add(term.pointName);
             }
@@ -379,14 +490,17 @@ export function sigmaProtocol<T extends readonly string[]>(
 
     const scalarsArray = allScalars as MergeScalars<T>[];
     const pointsArray = allPoints as MergePoints<T>[];
+    const commitmentsArray = allCommitments as MergeCommitments<T>[];
 
-    // Create binary descriptor
-    const descriptor = createBinaryDescriptor(stmts, pointsArray, scalarsArray);
+    // Create binary descriptor - we need to include all points (generators + commitments)
+    const allPointsForDescriptor = [...allCommitments, ...allPoints];
+    const descriptor = createBinaryDescriptor(stmts, allPointsForDescriptor, scalarsArray);
 
     return {
         statements: stmts,
         scalars: scalarsArray,
         points: pointsArray,
+        commitments: commitmentsArray,
         descriptor
     };
 }
@@ -394,10 +508,11 @@ export function sigmaProtocol<T extends readonly string[]>(
 // Helper function to evaluate a sigma protocol
 export function evaluateProtocol<
     TScalars extends string,
-    TPoints extends string
+    TPoints extends string,
+    TCommitments extends string
 >(
-    protocol: SigmaProtocol<TScalars, TPoints>,
-    variables: { [K in TScalars]: bigint } & { [K in TPoints]: Point }
+    protocol: SigmaProtocol<TScalars, TPoints, TCommitments>,
+    variables: { [K in TScalars]: bigint } & { [K in TPoints | TCommitments]: Point }
 ): { results: { leftSide: Point; rightSide: Point; isValid: boolean }[]; allValid: boolean } {
     const results = protocol.statements.map(stmt =>
         evaluateStatement(stmt, variables as any)
@@ -409,4 +524,51 @@ export function evaluateProtocol<
         results,
         allValid
     };
+}
+
+// Validate that statements follow the rules:
+// 1. Variables on right side must not be used on left side of the same statement
+// 2. Can use commitments from previous statements on the right side
+function validateStatements(statements: Statement<string>[]): void {
+    const definedCommitments = new Set<string>();
+    
+    for (let i = 0; i < statements.length; i++) {
+        const stmt = statements[i];
+        const leftVar = stmt.parsed.left;
+        
+        // Check that left side variable is not used on right side of same statement
+        for (const term of stmt.parsed.terms) {
+            if (term.pointName === leftVar) {
+                throw new Error(
+                    `Invalid statement at index ${i}: Variable '${leftVar}' cannot appear on both left and right side of the same statement`
+                );
+            }
+        }
+        
+        // Check that right side only uses previously defined commitments or generator points
+        for (const term of stmt.parsed.terms) {
+            const pointName = term.pointName;
+            
+            // G is always allowed
+            if (pointName === 'G') continue;
+            
+            // Check if it's a commitment from a future statement
+            let isCommitmentFromFuture = false;
+            for (let j = i + 1; j < statements.length; j++) {
+                if (statements[j].parsed.left === pointName) {
+                    isCommitmentFromFuture = true;
+                    break;
+                }
+            }
+            
+            if (isCommitmentFromFuture) {
+                throw new Error(
+                    `Invalid statement at index ${i}: Cannot use commitment '${pointName}' before it is defined`
+                );
+            }
+        }
+        
+        // Add this statement's commitment to the set of defined commitments
+        definedCommitments.add(leftVar);
+    }
 }

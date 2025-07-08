@@ -12,7 +12,8 @@ import {
   type ExtractProtocolScalars,
   type ExtractProtocolPoints,
   type ProtocolVariables,
-  type SigmaProtocol
+  type SigmaProtocol,
+  ExtractProtocolCommitments
 } from './sigmaDefinition';
 
 describe('Sigma Statement Definition', () => {
@@ -26,7 +27,7 @@ describe('Sigma Statement Definition', () => {
 
   beforeEach(() => {
     // Generate test points and scalars
-    G = Point.fromHash('generator_G', 'test_domain');
+    G = Point.BASE; // G is always Point.BASE in our implementation
     H = Point.fromHash('generator_H', 'test_domain');
     a = generateRandomScalar();
     b = generateRandomScalar();
@@ -166,7 +167,7 @@ describe('Sigma Statement Definition', () => {
   describe('evaluateStatement', () => {
     it('should evaluate true statements correctly', () => {
       const stmt = statement('P = G^a + H^b');
-      const variables = { P, G, H, a, b };
+      const variables = { P, H, a, b };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -177,7 +178,7 @@ describe('Sigma Statement Definition', () => {
     it('should evaluate false statements correctly', () => {
       const wrongP = G.multiply(generateRandomScalar());
       const stmt = statement('P = G^a + H^b');
-      const variables = { P: wrongP, G, H, a, b };
+      const variables = { P: wrongP, H, a, b };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(false);
@@ -187,7 +188,7 @@ describe('Sigma Statement Definition', () => {
 
     it('should handle single term statements', () => {
       const stmt = statement('Q = G^c');
-      const variables = { Q, G, c };
+      const variables = { Q, c };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -217,7 +218,10 @@ describe('Sigma Statement Definition', () => {
       
       // Should merge all scalars and points
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q']));
+      // Points now only contains generators (right side), excluding G which is implicit
+      expect(protocol.points).toEqual(['H']);
+      // Commitments contain the result points (left side)
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'Q']));
     });
 
     it('should create binary descriptor', () => {
@@ -227,26 +231,28 @@ describe('Sigma Statement Definition', () => {
       expect(protocol.descriptor.length).toBeGreaterThan(0);
       
       // Binary descriptor structure for this protocol:
-      // Points order of appearance: P, G, H, Q (index 0, 1, 2, 3)
+      // allPointsForDescriptor order: P, Q, H (commitments first, then generators)
+      // G is always at index 0 (implicit)
+      // Index mapping: P=1, Q=2, H=3
       // Scalars order of appearance: a, b, c (index 0, 1, 2)
       // [2] - number of statements
       // Statement 1: P = G^a + H^b
-      // [0] - index of P in points array
+      // [1] - index of P
       // [2] - number of terms on right
-      // [1, 0] - G (index 1) ^ a (index 0)
-      // [2, 1] - H (index 2) ^ b (index 1)
+      // [0, 0] - G (always index 0) ^ a (index 0)
+      // [3, 1] - H (index 3) ^ b (index 1)
       // Statement 2: Q = G^c
-      // [3] - index of Q in points array
+      // [2] - index of Q
       // [1] - number of terms
-      // [1, 2] - G (index 1) ^ c (index 2)
+      // [0, 2] - G (always index 0) ^ c (index 2)
       
       const expectedDescriptor = new Uint8Array([
         2,          // 2 statements
-        0, 2,       // P (index 0), 2 terms
-        1, 0,       // G^a
-        2, 1,       // H^b
-        3, 1,       // Q (index 3), 1 term
-        1, 2        // G^c
+        1, 2,       // P (index 1), 2 terms
+        0, 0,       // G^a (G is always 0)
+        3, 1,       // H^b (H is index 3)
+        2, 1,       // Q (index 2), 1 term
+        0, 2        // G^c (G is always 0)
       ]);
       
       expect(protocol.descriptor).toEqual(expectedDescriptor);
@@ -263,8 +269,11 @@ describe('Sigma Statement Definition', () => {
       // Test that variable order is preserved
       const protocol = sigmaProtocol('P = G^a + H^b', 'Q = H^c + G^d');
       
-      // Points should be in order of first appearance
-      expect(protocol.points).toEqual(['P', 'G', 'H', 'Q']);
+      // Generator points should be in order of first appearance (right side), excluding G
+      expect(protocol.points).toEqual(['H']);
+      
+      // Commitments should be in order of first appearance (left side)
+      expect(protocol.commitments).toEqual(['P', 'Q']);
       
       // Scalars should be in order of first appearance
       expect(protocol.scalars).toEqual(['a', 'b', 'c', 'd']);
@@ -275,33 +284,43 @@ describe('Sigma Statement Definition', () => {
       const protocol1 = sigmaProtocol('P = G^a + H^b');
       const protocol2 = sigmaProtocol('P = G^a + G^b'); // Using G twice instead of G and H
       
-      // Different points used
-      expect(protocol1.points).toEqual(['P', 'G', 'H']);
-      expect(protocol2.points).toEqual(['P', 'G']);
+      // Different generator points used (G is implicit, not included)
+      expect(protocol1.points).toEqual(['H']);
+      expect(protocol2.points).toEqual([]);
+      
+      // Same commitment points
+      expect(protocol1.commitments).toEqual(['P']);
+      expect(protocol2.commitments).toEqual(['P']);
       
       // Descriptors should be different
       expect(protocol1.descriptor).not.toEqual(protocol2.descriptor);
     });
 
     it('should handle complex protocols with many terms', () => {
+      // This test uses P and Q as external generator points (not commitments)
       const protocol = sigmaProtocol(
         'R = P^x + Q^y + G^z + H^w',
         'S = R^v + P^u'
       );
       
-      // Points order of appearance: R, P, Q, G, H, S (index 0, 1, 2, 3, 4, 5)
+      // Binary descriptor structure:
+      // G is always at index 0 (implicit)
+      // allCommitments: [R, S] (order of first appearance as commitments)
+      // allPoints: [P, Q, H] (P and Q are external generators, not commitments in this protocol)
+      // allPointsForDescriptor: [...allCommitments, ...allPoints] = [R, S, P, Q, H]
+      // Index mapping with offset: R=1, S=2, P=3, Q=4, H=5
       // Scalars order of appearance: x, y, z, w, v, u (index 0, 1, 2, 3, 4, 5)
       
       const expectedDescriptor = new Uint8Array([
         2,                // 2 statements
-        0, 4,             // R (index 0), 4 terms
-        1, 0,             // P^x (P=1, x=0)
-        2, 1,             // Q^y (Q=2, y=1)
-        3, 2,             // G^z (G=3, z=2)
-        4, 3,             // H^w (H=4, w=3)
-        5, 2,             // S (index 5), 2 terms
-        0, 4,             // R^v (R=0, v=4)
-        1, 5              // P^u (P=1, u=5)
+        1, 4,             // R (index 1), 4 terms
+        3, 0,             // P^x (P=3, x=0)
+        4, 1,             // Q^y (Q=4, y=1)
+        0, 2,             // G^z (G=0, z=2)
+        5, 3,             // H^w (H=5, w=3)
+        2, 2,             // S (index 2), 2 terms
+        1, 4,             // R^v (R=1, v=4)
+        3, 5              // P^u (P=3, u=5)
       ]);
       
       expect(protocol.descriptor).toEqual(expectedDescriptor);
@@ -325,16 +344,47 @@ describe('Sigma Statement Definition', () => {
       
       // Should deduplicate shared variables
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'R']));
+      expect(protocol.points).toEqual(['H']); // G is implicit, not included
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'R']));
       expect(protocol.scalars).toHaveLength(3); // a, b, c (no duplicates)
-      expect(protocol.points).toHaveLength(4); // P, G, H, R (no duplicates)
+      expect(protocol.points).toHaveLength(1); // H only (G is implicit)
+      expect(protocol.commitments).toHaveLength(2); // P, R (no duplicates)
+    });
+
+    it('should exclude commitments from points list when used as generators', () => {
+      // This protocol defines P and Q as commitments, then uses them as generators
+      const protocol = sigmaProtocol(
+        'P = G^a + H^b',
+        'Q = G^c', 
+        'R = P^d + Q^e'
+      );
+      
+      // P and Q should NOT be in points list since they're commitments
+      expect(protocol.scalars).toEqual(['a', 'b', 'c', 'd', 'e']);
+      expect(protocol.points).toEqual(['H']); // Only H, not P or Q
+      expect(protocol.commitments).toEqual(['P', 'Q', 'R']);
+      
+      // Binary descriptor should still work correctly
+      const expectedDescriptor = new Uint8Array([
+        3,          // 3 statements
+        1, 2,       // P (index 1), 2 terms
+        0, 0,       // G^a (G=0, a=0)
+        4, 1,       // H^b (H=4, b=1)
+        2, 1,       // Q (index 2), 1 term
+        0, 2,       // G^c (G=0, c=2)
+        3, 2,       // R (index 3), 2 terms
+        1, 3,       // P^d (P=1, d=3)
+        2, 4        // Q^e (Q=2, e=4)
+      ]);
+      
+      expect(protocol.descriptor).toEqual(expectedDescriptor);
     });
   });
 
   describe('evaluateProtocol', () => {
     it('should evaluate all statements in protocol', () => {
       const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
-      const variables = { P, G, H, Q, a, b, c };
+      const variables = { P, H, Q, a, b, c };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.results).toHaveLength(2);
@@ -346,7 +396,7 @@ describe('Sigma Statement Definition', () => {
     it('should detect when some statements fail', () => {
       const wrongQ = G.multiply(generateRandomScalar());
       const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
-      const variables = { P, G, H, Q: wrongQ, a, b, c };
+      const variables = { P, H, Q: wrongQ, a, b, c };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.results).toHaveLength(2);
@@ -377,7 +427,7 @@ describe('Sigma Statement Definition', () => {
       expect(stmt.points).toEqual(expect.arrayContaining(['P', 'G', 'H']));
       
       // This ensures the variable record type matches
-      const variables = { P, G, H, a, b };
+      const variables = { P, H, a, b };
       const result = evaluateStatement(stmt, variables);
       expect(result.isValid).toBe(true);
     });
@@ -410,10 +460,11 @@ describe('Sigma Statement Definition', () => {
       
       // All variables are merged and type-checked
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q']));
+      expect(protocol.points).toEqual(['H']); // G is implicit, not included
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'Q']));
       
       // Evaluation requires all merged variables with correct types
-      const variables = { P, G, H, Q, a, b, c };
+      const variables = { P, H, Q, a, b, c };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.allValid).toBe(true);
@@ -424,7 +475,7 @@ describe('Sigma Statement Definition', () => {
     it('should handle statements with same variable names', () => {
       const sameP = Point.add(G.multiply(a), H.multiply(b));
       const stmt = statement('P = G^a + H^b');
-      const variables = { P: sameP, G, H, a, b };
+      const variables = { P: sameP, H, a, b };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -434,7 +485,7 @@ describe('Sigma Statement Definition', () => {
       const zero = 0n;
       const zeroP = H.multiply(b); // Since G^0 = ZERO, P = ZERO + H^b = H^b
       const stmt = statement('P = G^a + H^b');
-      const variables = { P: zeroP, G, H, a: zero, b };
+      const variables = { P: zeroP, H, a: zero, b };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -444,7 +495,7 @@ describe('Sigma Statement Definition', () => {
       const identity = Point.ZERO;
       const zero = 0n;
       const stmt = statement('P = G^a');
-      const variables = { P: identity, G, a: zero };
+      const variables = { P: identity, a: zero };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -464,7 +515,7 @@ describe('Sigma Statement Definition', () => {
       );
       
       const stmt = statement('R = P^x + Q^y + G^z + H^w');
-      const variables = { R, P, Q, G, H, x, y, z, w };
+      const variables = { R, P, Q, H, x, y, z, w };
       const result = evaluateStatement(stmt, variables);
       
       expect(result.isValid).toBe(true);
@@ -496,14 +547,15 @@ describe('Sigma Statement Definition', () => {
       
       // 3. Protocol automatically merges all variables
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c', 'd', 'e']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q', 'R']));
+      expect(protocol.points).toEqual(['H']); // G is implicit, P and Q are commitments so not included
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'Q', 'R']));
       
       // 4. Evaluate with type-safe variable binding
       const d = generateRandomScalar();
       const e = generateRandomScalar();
       const R = Point.add(P.multiply(d), Q.multiply(e));
       
-      const variables = { P, G, H, Q, R, a, b, c, d, e };
+      const variables = { P, H, Q, R, a, b, c, d, e };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.allValid).toBe(true);
@@ -519,10 +571,11 @@ describe('Sigma Statement Definition', () => {
       
       // This demonstrates the type contains the actual variable names
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q']));
+      expect(protocol.points).toEqual(['H']); // G is implicit, not included
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'Q']));
       
       // Variables must exactly match the inferred types
-      const variables = { P, G, H, Q, a, b, c };
+      const variables = { P, H, Q, a, b, c };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.allValid).toBe(true);
@@ -556,10 +609,10 @@ describe('Sigma Statement Definition', () => {
       
       // This should compile without errors - ExtractProtocolPoints extracts the point union type
       type ProtocolPoints = ExtractProtocolPoints<typeof protocol>;
-      const pointNames = assertPointType<ProtocolPoints>(['P', 'G', 'H', 'Q']);
+      const pointNames = assertPointType<ProtocolPoints>(['H']);
       
-      expect(pointNames).toEqual(['P', 'G', 'H', 'Q']);
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q']));
+      expect(pointNames).toEqual(['H']);
+      expect(protocol.points).toEqual(['H']); // G is implicit, not included
     });
 
     it('should create complete variable record type from protocol', () => {
@@ -569,7 +622,7 @@ describe('Sigma Statement Definition', () => {
       type Variables = ProtocolVariables<typeof protocol>;
       
       // This should compile without errors - all required variables with correct types
-      const variables: Variables = { P, G, H, Q, a, b, c };
+      const variables: Variables = { P, H, Q, a, b, c };
       
       // Should work with evaluateProtocol
       const result = evaluateProtocol(protocol, variables);
@@ -580,7 +633,7 @@ describe('Sigma Statement Definition', () => {
       expect(typeof variables.b).toBe('bigint');
       expect(typeof variables.c).toBe('bigint');
       expect(variables.P).toBeInstanceOf(Point);
-      expect(variables.G).toBeInstanceOf(Point);
+      // G is implicit, not part of variables
       expect(variables.H).toBeInstanceOf(Point);
       expect(variables.Q).toBeInstanceOf(Point);
     });
@@ -598,7 +651,8 @@ describe('Sigma Statement Definition', () => {
       
       // Should extract all unique scalars and points
       expect(protocol.scalars).toEqual(expect.arrayContaining(['a', 'b', 'c', 'd', 'e', 'f']));
-      expect(protocol.points).toEqual(expect.arrayContaining(['P', 'G', 'H', 'Q', 'R']));
+      expect(protocol.points).toEqual(['H']); // G is implicit, P and Q are commitments so not included
+      expect(protocol.commitments).toEqual(expect.arrayContaining(['P', 'Q', 'R']));
       
       // Create variables using the extracted types
       const d = generateRandomScalar();
@@ -606,7 +660,7 @@ describe('Sigma Statement Definition', () => {
       const f = generateRandomScalar();
       const R = Point.add(Point.add(P.multiply(d), Q.multiply(e)), H.multiply(f));
       
-      const variables: Variables = { P, G, H, Q, R, a, b, c, d, e, f };
+      const variables: Variables = { P, H, Q, R, a, b, c, d, e, f };
       const result = evaluateProtocol(protocol, variables);
       
       expect(result.allValid).toBe(true);
@@ -645,12 +699,39 @@ describe('Sigma Statement Definition', () => {
       // Usage example
       type Scalars = ExtractProtocolScalars<typeof protocol>;
       type Points = ExtractProtocolPoints<typeof protocol>;
+      type Commitments = ExtractProtocolCommitments<typeof protocol>;
       
       const scalars = generateScalars(protocol.scalars);
       const points = generatePoints(protocol.points);
-      const allVariables = { ...scalars, ...points };
       
-      const result = processProtocolVariables(protocol, allVariables);
+      // Calculate commitments based on the protocol statements
+      const commitments = {} as { [K in Commitments]: Point };
+      const allVariables = { ...points } as any;
+      
+      // Process statements in order to handle dependencies
+      for (const stmt of protocol.statements) {
+        let commitmentPoint = Point.ZERO;
+        for (const term of stmt.parsed.terms) {
+          const scalar = scalars[term.scalarName as keyof typeof scalars];
+          let point: Point;
+          if (term.pointName === 'G') {
+            point = Point.BASE;
+          } else if (term.pointName in allVariables) {
+            point = allVariables[term.pointName];
+          } else {
+            throw new Error(`Point ${term.pointName} not found`);
+          }
+          if (scalar !== 0n) {
+            commitmentPoint = commitmentPoint.add(point.multiply(scalar));
+          }
+        }
+        commitments[stmt.parsed.left as keyof typeof commitments] = commitmentPoint;
+        allVariables[stmt.parsed.left] = commitmentPoint;
+      }
+      
+      const finalVariables = { ...scalars, ...points, ...commitments };
+      
+      const result = processProtocolVariables(protocol, finalVariables);
       expect(result.results).toHaveLength(2);
     });
   });

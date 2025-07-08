@@ -119,7 +119,7 @@ export function createAlgebraicBlindedToken(
 
     // Return result
     return {
-        signature: concatBytes(R.toBytes(), encodeBigInt(sigma)),
+        signature: concatBytes(R.toBytes(), exportBigInt(sigma)),
         timestamp
     };
 }

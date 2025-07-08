@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "pkgroll",
+    "typecheck": "tsc --noEmit",
     "release": "yarn build && yarn test && yarn publish"
   },
   "main": "./dist/index.cjs",
