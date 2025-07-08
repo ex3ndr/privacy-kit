@@ -1,25 +1,19 @@
 import { Point } from '../math/point';
-import { generateRandomScalar, deriveScalar } from '../math/scalar';
+import { deriveScalar } from '../math/scalar';
 import { concatBytes } from '@/modules/formats/bytes';
 import { encodeUTF8 } from '@/modules/formats/text';
-import { encodeBigInt, exportBigInt } from '../encoding/bigint';
+import { encodeBigInt } from '../encoding/bigint';
 import {
-    ProtocolVariables,
     ProtocolInputVariables,
     ProtocolVerificationVariables,
     SigmaProtocol,
     ExtractProtocolScalars,
-    ExtractProtocolPoints,
     ExtractProtocolCommitments
 } from "./sigmaDefinition";
 
 // Sigma proof structure following the commit-challenge-response pattern
 export type SigmaProof<TScalars extends string = string> = {
-    // Commitments: random values for each secret scalar (needed for verification)
-    commitments: { [K in TScalars]: Point };
-    // Challenge: derived from protocol, commitment points, and context
     challenge: bigint;
-    // Responses: challenge * secret + randomness for each scalar
     responses: { [K in TScalars]: bigint };
 };
 
@@ -31,134 +25,177 @@ export function createSigmaProof<T extends SigmaProtocol<any, any, any>>(
     usage: string
 ): {
     proof: SigmaProof<ExtractProtocolScalars<T>>;
-    commitmentPoints: { [K in ExtractProtocolCommitments<T>]: Point };
+    computed: { [K in ExtractProtocolCommitments<T>]: Point };
 } {
 
-    // Step 1: Derive initial seed from protocol, nonce, usage, and all scalar values
-    const scalarBytes = protocol.scalars.map(scalarName => {
-        const scalarValue = variables[scalarName as keyof typeof variables] as bigint;
-        return addToTranscript(exportBigInt(scalarValue));
-    });
-    const randomnessSeed = concatBytes(
-        addToTranscript(encodeUTF8('commitment_randomness')),
-        addToTranscript(encodeUTF8(usage)),
-        addToTranscript(protocol.descriptor),
-        addToTranscript(nonce),
-        ...scalarBytes,
-    );
+    //
+    // Step 1: Calculate computed points (left side values) for the protocol
+    // These are the public commitments that we're proving knowledge of
+    //
 
-    // Step 2: First calculate commitment points (left side values) for the protocol
-    const commitmentPoints: { [key: string]: Point } = {};
-    const allVariables = { ...variables } as any;
-    
-    // Process statements in order to allow using previous commitments
+    let allVariables: { [key: string]: Point | bigint } = { ...variables };
+    let computed: { [K in ExtractProtocolCommitments<T>]: Point } = {} as { [K in ExtractProtocolCommitments<T>]: Point };
+
+    // Process statements in order to allow using previous computed values
     for (const statement of protocol.statements) {
-        let commitmentPoint = Point.ZERO;
-        
+        let computedPoint = Point.ZERO;
+
         for (const term of statement.parsed.terms) {
-            const scalar = allVariables[term.scalarName] as bigint;
+            const scalar = variables[term.scalarName as keyof typeof variables] as bigint;
+            if (scalar === undefined) {
+                throw new Error(`Missing scalar: ${term.scalarName}`);
+            }
+
             let point: Point;
-            
             if (term.pointName === 'G') {
                 point = Point.BASE;
             } else if (term.pointName in allVariables) {
-                point = allVariables[term.pointName] as Point;
+                point = allVariables[term.pointName as keyof typeof allVariables] as Point;
             } else {
                 throw new Error(`Point ${term.pointName} not found in variables`);
             }
-            
-            if (scalar === 0n) {
-                // Skip zero scalar terms
-                continue;
-            }
-            commitmentPoint = commitmentPoint.add(point.multiply(scalar));
-        }
-        
-        // Store the commitment point for future statements to use
-        commitmentPoints[statement.parsed.left] = commitmentPoint;
-        allVariables[statement.parsed.left] = commitmentPoint;
-    }
-    
-    // Step 3: Now generate random commitments for each secret scalar
-    const commitmentRandomness: { [key: string]: bigint } = {};
-    const commitments: { [key: string]: Point } = {};
-    
-    for (const scalarName of protocol.scalars) {
-        
-        // Derive randomness for this scalar from the randomness seed and scalar name
-        const scalarSeed = concatBytes(
-            addToTranscript(randomnessSeed),
-            addToTranscript(encodeUTF8(scalarName))
-        );
-        const randomness = deriveScalar(scalarSeed, 'scalar_randomness');
-        commitmentRandomness[scalarName] = randomness;
 
-        // Compute commitment: sum of all generator points that use this scalar
-        let commitment = Point.ZERO;
-
-        for (const statement of protocol.statements) {
-            for (const term of statement.parsed.terms) {
-                if (term.scalarName === scalarName) {
-                    // Get the generator point for this term
-                    let generatorPoint: Point;
-                    if (term.pointName === 'G') {
-                        generatorPoint = Point.BASE;
-                    } else if (term.pointName in allVariables) {
-                        generatorPoint = allVariables[term.pointName] as Point;
-                    } else {
-                        throw new Error(`Point ${term.pointName} not found`);
-                    }
-                    // Add generator^randomness to the commitment
-                    if (randomness !== 0n) {
-                        commitment = commitment.add(generatorPoint.multiply(randomness));
-                    }
-                }
+            if (scalar !== 0n) {
+                computedPoint = computedPoint.add(point.multiply(scalar));
             }
         }
 
-        commitments[scalarName] = commitment;
+        // Store the computed point for future statements to use
+        computed[statement.parsed.left as keyof typeof computed] = computedPoint;
+        allVariables[statement.parsed.left] = computedPoint;
     }
-    
-    // Step 4: Generate challenge using Fiat-Shamir heuristic
-    const generatorPointsArray = protocol.points.map(pointName => {
+
+    //
+    // Step 2: Create initial SHO state by absorbing protocol, computed values, and generator points
+    //
+
+    const transcript: Uint8Array[] = [
+        addToTranscript(encodeUTF8(usage)),
+        addToTranscript(protocol.descriptor),
+    ];
+
+    // Add generator points (excluding G which is implicit)
+    for (const pointName of protocol.points) {
         const point = variables[pointName as keyof typeof variables] as Point;
         if (!point) {
             throw new Error(`Missing generator point: ${pointName}`);
         }
-        return point;
-    });
-    
-    const commitmentPointsArray = protocol.commitments.map(commitmentName => {
-        return commitmentPoints[commitmentName];
-    });
-    
-    const challenge = generateChallenge({
-        protocol,
-        commitmentPoints: commitmentPointsArray,
-        generatorPoints: generatorPointsArray,
-        nonce,
-        usage
-    });
+        transcript.push(addToTranscript(point.toBytes()));
+    }
 
-    // Step 5: Generate responses: response = challenge * secret + randomness
-    const responses: { [key: string]: bigint } = {};
+    // Add computed points
+    for (const commitmentName of protocol.commitments) {
+        const point = computed[commitmentName as keyof typeof computed];
+        transcript.push(addToTranscript(point.toBytes()));
+    }
 
+    //
+    // Step 3: Generate synthetic nonce by hashing randomness, witness (secret scalars), and nonce
+    // This ensures the randomness appears random but is deterministic for the same inputs
+    //
+
+    const nonceTranscriptParts = [
+        addToTranscript(encodeUTF8('nonce_generation')),
+        addToTranscript(nonce),
+        ...transcript,
+    ];
+
+    // Add all secret scalars to nonce generation
     for (const scalarName of protocol.scalars) {
-        const secret = variables[scalarName as keyof ProtocolInputVariables<T>] as bigint;
-        const randomness = commitmentRandomness[scalarName];
+        const scalar = variables[scalarName as keyof typeof variables] as bigint;
+        if (scalar === undefined) {
+            throw new Error(`Missing scalar: ${scalarName}`);
+        }
+        nonceTranscriptParts.push(addToTranscript(encodeBigInt(scalar)));
+    }
 
-        // response = challenge * secret + randomness (mod curve order)
-        const response = (challenge * secret + randomness) % Point.ORDER;
-        responses[scalarName] = response;
+    // Generate one random value per scalar
+    const randomnessValues: { [key: string]: bigint } = {};
+    const nonceSeed = concatBytes(...nonceTranscriptParts);
+    
+    for (let i = 0; i < protocol.scalars.length; i++) {
+        const scalarName = protocol.scalars[i];
+        randomnessValues[scalarName] = deriveScalar(
+            concatBytes(nonceSeed, encodeBigInt(BigInt(i))), 
+            'nonce'
+        );
+    }
+
+    //
+    // Step 4: Compute randomness commitments (this is what makes it a proper sigma protocol)
+    // For each statement: R = sum(generator_i^randomness_i)
+    //
+
+    const randomnessCommitments: Point[] = [];
+    allVariables = { ...variables }; // Reset to original variables
+    
+    for (const statement of protocol.statements) {
+        let randomnessCommitment = Point.ZERO;
+
+        for (const term of statement.parsed.terms) {
+            const randomness = randomnessValues[term.scalarName];
+            
+            let point: Point;
+            if (term.pointName === 'G') {
+                point = Point.BASE;
+            } else if (term.pointName in allVariables) {
+                point = allVariables[term.pointName as keyof typeof allVariables] as Point;
+            } else {
+                throw new Error(`Point ${term.pointName} not found in variables`);
+            }
+
+            if (randomness !== 0n) {
+                randomnessCommitment = randomnessCommitment.add(point.multiply(randomness));
+            }
+        }
+
+        randomnessCommitments.push(randomnessCommitment);
+        
+        // Store the computed value for this statement (for use in subsequent statements)
+        allVariables[statement.parsed.left] = computed[statement.parsed.left as keyof typeof computed];
+    }
+
+    //
+    // Step 5: Generate challenge using Fiat-Shamir heuristic
+    // Include the randomness commitments (this is crucial!)
+    //
+
+    const challengeTranscriptParts = [
+        addToTranscript(encodeUTF8('challenge_generation')),
+        ...transcript,
+    ];
+
+    // Add randomness commitments to challenge
+    for (const commitment of randomnessCommitments) {
+        challengeTranscriptParts.push(addToTranscript(commitment.toBytes()));
+    }
+    
+    // Add nonce to challenge (important for preventing replay attacks)
+    challengeTranscriptParts.push(addToTranscript(nonce));
+
+    const challenge = deriveScalar(concatBytes(...challengeTranscriptParts), 'challenge');
+
+    //
+    // Step 6: Compute responses
+    // For each scalar: response = scalar * challenge + randomness
+    //
+
+    const responses: { [K in ExtractProtocolScalars<T>]: bigint } = {} as { [K in ExtractProtocolScalars<T>]: bigint };
+    
+    for (const scalarName of protocol.scalars) {
+        const scalar = variables[scalarName as keyof typeof variables] as bigint;
+        const randomness = randomnessValues[scalarName];
+        
+        // response = scalar * challenge + randomness (mod order)
+        responses[scalarName as keyof typeof responses] = (scalar * challenge + randomness) % Point.ORDER;
     }
 
     return {
         proof: {
-            commitments: commitments as { [K in ExtractProtocolScalars<T>]: Point },
             challenge,
-            responses: responses as { [K in ExtractProtocolScalars<T>]: bigint }
+            responses
         },
-        commitmentPoints: commitmentPoints as { [K in ExtractProtocolCommitments<T>]: Point }
+        computed
     };
 }
 
@@ -175,95 +212,112 @@ export function verifySigmaProof<
     usage: string
 ): { isValid: boolean; error?: string } {
     try {
-        const { commitments, challenge, responses } = proof;
+        const { challenge, responses } = proof;
 
-        // Step 1: Extract generator points from verification variables
-        const generatorPointsArray = protocol.points.map(pointName => {
+        //
+        // Step 1: Create initial transcript exactly as the prover did
+        //
+
+        const transcript: Uint8Array[] = [
+            addToTranscript(encodeUTF8(usage)),
+            addToTranscript(protocol.descriptor),
+        ];
+
+        // Add generator points (excluding G)
+        for (const pointName of protocol.points) {
             const point = variables[pointName as keyof typeof variables] as Point;
             if (!point) {
                 throw new Error(`Missing generator point: ${pointName}`);
             }
-            return point;
-        });
-        
-        // Extract commitment points from verification variables
-        const commitmentPointsArray = protocol.commitments.map(commitmentName => {
+            transcript.push(addToTranscript(point.toBytes()));
+        }
+
+        // Add computed points (public commitments)
+        for (const commitmentName of protocol.commitments) {
             const point = variables[commitmentName as keyof typeof variables] as Point;
             if (!point) {
                 throw new Error(`Missing commitment point: ${commitmentName}`);
             }
-            return point;
-        });
-
-        // Step 2: Recompute the challenge
-        const expectedChallenge = generateChallenge({
-            protocol,
-            commitmentPoints: commitmentPointsArray,
-            generatorPoints: generatorPointsArray,
-            nonce,
-            usage
-        });
-
-        if (challenge !== expectedChallenge) {
-            return { isValid: false, error: 'Challenge verification failed' };
+            transcript.push(addToTranscript(point.toBytes()));
         }
 
-        // Step 2: Verify the sigma protocol equation
-        // The equation is: commitment + challenge * leftSide = generator^response
-        // Or rearranged: commitments + challenge * leftSides = generator^responses
+        //
+        // Step 2: Reconstruct randomness commitments from responses and challenge
+        // For each statement: R = sum(G_i^response_i) - commitment^challenge
+        //
+
+        const randomnessCommitments: Point[] = [];
+        let allVariables: { [key: string]: Point | bigint } = { ...variables };
         
-        let totalCommitments = Point.ZERO;
-        let totalChallengeTimesLeftSides = Point.ZERO;
-        let totalGeneratorResponses = Point.ZERO;
-
-        // Add all scalar commitments
-        for (const scalarName of protocol.scalars) {
-            const commitment = commitments[scalarName as TScalars];
-            if (!commitment) {
-                return { isValid: false, error: `Missing commitment for scalar ${scalarName}` };
-            }
-            totalCommitments = totalCommitments.add(commitment);
-        }
-
-        // Add challenge * leftSide for each statement
         for (const statement of protocol.statements) {
-            const leftSidePoint = variables[statement.parsed.left as keyof ProtocolVerificationVariables<SigmaProtocol<TScalars, TPoints, TCommitments>>];
-            if (!leftSidePoint) {
-                return { isValid: false, error: `Left side point ${statement.parsed.left} not found` };
-            }
-            totalChallengeTimesLeftSides = totalChallengeTimesLeftSides.add(leftSidePoint.multiply(challenge));
-        }
+            // First compute sum(G_i^response_i)
+            let responseCommitment = Point.ZERO;
 
-        // Add all generator^response terms
-        for (const statement of protocol.statements) {
             for (const term of statement.parsed.terms) {
-                let generatorPoint: Point;
-                if (term.pointName === 'G') {
-                    generatorPoint = Point.BASE;
-                } else {
-                    const point = variables[term.pointName as keyof ProtocolVerificationVariables<SigmaProtocol<TScalars, TPoints, TCommitments>>];
-                    if (!point) {
-                        return { isValid: false, error: `Missing point ${term.pointName}` };
-                    }
-                    generatorPoint = point;
-                }
-                
                 const response = responses[term.scalarName as TScalars];
                 if (response === undefined) {
                     return { isValid: false, error: `Missing response for scalar ${term.scalarName}` };
                 }
 
+                let point: Point;
+                if (term.pointName === 'G') {
+                    point = Point.BASE;
+                } else if (term.pointName in allVariables) {
+                    point = allVariables[term.pointName as keyof typeof allVariables] as Point;
+                } else {
+                    return { isValid: false, error: `Missing point ${term.pointName}` };
+                }
+
                 if (response !== 0n) {
-                    totalGeneratorResponses = totalGeneratorResponses.add(generatorPoint.multiply(response));
+                    responseCommitment = responseCommitment.add(point.multiply(response));
                 }
             }
+
+            // Get the public commitment for this statement
+            const commitmentName = statement.parsed.left as TCommitments;
+            const publicCommitment = variables[commitmentName as keyof typeof variables] as Point;
+            
+            if (!publicCommitment) {
+                return { isValid: false, error: `Missing commitment point: ${commitmentName}` };
+            }
+
+            // Compute randomness commitment: R = sum(G_i^response_i) - commitment^challenge
+            // This is equivalent to: R = sum(G_i^response_i) + commitment^(-challenge)
+            const randomnessCommitment = responseCommitment.add(
+                publicCommitment.multiply((Point.ORDER - challenge) % Point.ORDER)
+            );
+
+            randomnessCommitments.push(randomnessCommitment);
+            
+            // Store computed value for use in subsequent statements
+            allVariables[statement.parsed.left] = publicCommitment;
         }
 
-        // Verify the equation: commitments + challenge * leftSides = generator^responses
-        const leftSide = totalCommitments.add(totalChallengeTimesLeftSides);
+        //
+        // Step 3: Reconstruct challenge from randomness commitments
+        //
+
+        const challengeTranscriptParts = [
+            addToTranscript(encodeUTF8('challenge_generation')),
+            ...transcript,
+        ];
+
+        // Add randomness commitments
+        for (const commitment of randomnessCommitments) {
+            challengeTranscriptParts.push(addToTranscript(commitment.toBytes()));
+        }
         
-        if (!leftSide.equals(totalGeneratorResponses)) {
-            return { isValid: false, error: 'Proof equation verification failed' };
+        // Add nonce to challenge
+        challengeTranscriptParts.push(addToTranscript(nonce));
+
+        const expectedChallenge = deriveScalar(concatBytes(...challengeTranscriptParts), 'challenge');
+
+        //
+        // Step 4: Verify the challenge matches
+        //
+
+        if (challenge !== expectedChallenge) {
+            return { isValid: false, error: 'Challenge verification failed' };
         }
 
         return { isValid: true };
@@ -277,50 +331,3 @@ function addToTranscript(data: Uint8Array): Uint8Array {
     const length = encodeBigInt(BigInt(data.length));
     return concatBytes(length, data);
 }
-
-// Generate challenge using Fiat-Shamir heuristic
-function generateChallenge(opts: {
-    protocol: SigmaProtocol<any, any, any>;
-    commitmentPoints: Point[];
-    generatorPoints: Point[];
-    nonce: Uint8Array;
-    usage: string;
-}): bigint {
-    const { protocol, commitmentPoints, generatorPoints, nonce, usage } = opts;
-
-    // Build transcript for Fiat-Shamir with length prefixing
-    const transcriptParts: Uint8Array[] = [
-        addToTranscript(encodeUTF8(usage)), // Usage provides domain separation
-        addToTranscript(nonce),
-        addToTranscript(protocol.descriptor) // Use binary descriptor
-    ];
-
-    // Add generator points to transcript (in order of appearance)
-    for (const point of generatorPoints) {
-        transcriptParts.push(addToTranscript(point.toBytes()));
-    }
-
-    // Add commitment points to transcript (in order of appearance)
-    for (const point of commitmentPoints) {
-        transcriptParts.push(addToTranscript(point.toBytes()));
-    }
-
-    // Derive challenge from transcript
-    const transcript = concatBytes(...transcriptParts);
-    return deriveScalar(transcript, 'fiat_shamir_challenge');
-}
-
-// Extract public points (generators) from the input variable set
-function extractPublicPoints<T extends SigmaProtocol<any, any, any>>(
-    protocol: T,
-    variables: ProtocolInputVariables<T>
-): { [K in ExtractProtocolPoints<T>]: Point } {
-    const publicVars: any = {};
-
-    for (const pointName of protocol.points) {
-        publicVars[pointName] = variables[pointName as keyof ProtocolInputVariables<T>];
-    }
-
-    return publicVars;
-}
-

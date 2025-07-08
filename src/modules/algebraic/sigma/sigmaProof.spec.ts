@@ -48,7 +48,7 @@ describe('Sigma Proof', () => {
             // G is implicit, so we don't include it in variables
             const variables = { H, a, b };
 
-            const { proof } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -59,10 +59,9 @@ describe('Sigma Proof', () => {
             expect(proof.challenge).toBeGreaterThan(0n);
             expect(proof.challenge).toBeLessThan(Point.ORDER);
 
-            // Check commitments
-            expect(Object.keys(proof.commitments)).toEqual(expect.arrayContaining(['a', 'b']));
-            expect(proof.commitments.a).toBeInstanceOf(Point);
-            expect(proof.commitments.b).toBeInstanceOf(Point);
+            // Check computed values (separate from proof, indexed by commitment names)
+            expect(Object.keys(computed)).toEqual(expect.arrayContaining(['P']));
+            expect(computed.P).toBeInstanceOf(Point);
 
             // Check responses
             expect(Object.keys(proof.responses)).toEqual(expect.arrayContaining(['a', 'b']));
@@ -76,36 +75,34 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
             const variables = { H, Q, a, b, c };
 
-            const { proof } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'test_multiple_statements'
             );
 
-
-            // Check all scalars have commitments and responses
-            expect(Object.keys(proof.commitments)).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+            // Check all statements have computed values and all scalars have responses
+            expect(Object.keys(computed)).toEqual(expect.arrayContaining(['P', 'Q']));
             expect(Object.keys(proof.responses)).toEqual(expect.arrayContaining(['a', 'b', 'c']));
 
-            // All commitments should be valid points
-            expect(proof.commitments.a).toBeInstanceOf(Point);
-            expect(proof.commitments.b).toBeInstanceOf(Point);
-            expect(proof.commitments.c).toBeInstanceOf(Point);
+            // All computed values should be valid points
+            expect(computed.P).toBeInstanceOf(Point);
+            expect(computed.Q).toBeInstanceOf(Point);
         });
 
         it('should create a valid proof for complex protocol', () => {
             const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c', 'R = P^d + Q^e');
             const variables = { H, a, b, c, d, e };
 
-            const { proof } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'complex_proof'
             );
 
-            expect(Object.keys(proof.commitments)).toEqual(expect.arrayContaining(['a', 'b', 'c', 'd', 'e']));
+            expect(Object.keys(computed)).toEqual(expect.arrayContaining(['P', 'Q', 'R']));
             expect(Object.keys(proof.responses)).toEqual(expect.arrayContaining(['a', 'b', 'c', 'd', 'e']));
         });
     });
@@ -115,19 +112,19 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'test_proof'
             );
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'test_proof');
 
             if (!result.isValid) {
                 console.log('Verification failed:', result.error);
-                console.log('Commitment points:', commitmentPoints);
+                console.log('Computed points:', computed);
                 console.log('Public variables:', publicVariables);
             }
             expect(result.isValid).toBe(true);
@@ -138,14 +135,14 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c');
             const variables = { H, a, b, c };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'test_multiple_verification'
             );
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'test_multiple_verification');
 
             expect(result.isValid).toBe(true);
@@ -156,14 +153,14 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b', 'Q = G^c', 'R = P^d + Q^e');
             const variables = { H, a, b, c, d, e };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'complex_proof'
             );
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'complex_proof');
 
             expect(result.isValid).toBe(true);
@@ -174,7 +171,7 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -187,7 +184,7 @@ describe('Sigma Proof', () => {
                 challenge: (proof.challenge + 1n) % Point.ORDER
             };
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, tamperedProof, publicVariables, nonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
@@ -198,7 +195,7 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -214,45 +211,42 @@ describe('Sigma Proof', () => {
                 }
             };
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, tamperedProof, publicVariables, nonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
-            expect(result.error).toBe('Proof equation verification failed');
+            expect(result.error).toBe('Challenge verification failed');
         });
 
         it('should reject proof with wrong commitments', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'test_proof'
             );
 
-            // Tamper with a commitment
-            const tamperedProof = {
-                ...proof,
-                commitments: {
-                    ...proof.commitments,
-                    a: G.multiply(generateRandomScalar()) // Random point
-                }
+            // Tamper with the computed points provided to verifier
+            const tamperedPublicVariables = {
+                H,
+                ...computed,
+                P: G.multiply(generateRandomScalar()) // Wrong computed point
             };
 
-            const publicVariables = { H, ...commitmentPoints };
-            const result = verifySigmaProof(protocol, tamperedProof, publicVariables, nonce, 'test_proof');
+            const result = verifySigmaProof(protocol, proof, tamperedPublicVariables, nonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
-            expect(result.error).toBe('Proof equation verification failed');
+            expect(result.error).toBe('Challenge verification failed');
         });
 
         it('should reject proof with wrong public variables', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -273,7 +267,7 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -281,7 +275,7 @@ describe('Sigma Proof', () => {
             );
 
             // Missing public variable H
-            const publicVariables = { P: commitmentPoints.P } as any;
+            const publicVariables = { P: computed.P } as any;
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
@@ -293,7 +287,7 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -303,7 +297,7 @@ describe('Sigma Proof', () => {
             // Use different nonce in verification
             const differentNonce = encodeUTF8('different_nonce');
 
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, differentNonce, 'test_proof');
 
             expect(result.isValid).toBe(false);
@@ -320,23 +314,22 @@ describe('Sigma Proof', () => {
             // G is implicit, P and Q are commitments, not inputs
             const variables = { H, a, b, c };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'type_safety_test'
             );
 
-            // Proof should have the correct scalar and point types
-            expect(proof.commitments.a).toBeInstanceOf(Point);
-            expect(proof.commitments.b).toBeInstanceOf(Point);
-            expect(proof.commitments.c).toBeInstanceOf(Point);
+            // Proof should have the correct scalar types, computed values are separate
+            expect(computed.P).toBeInstanceOf(Point);
+            expect(computed.Q).toBeInstanceOf(Point);
             expect(typeof proof.responses.a).toBe('bigint');
             expect(typeof proof.responses.b).toBe('bigint');
             expect(typeof proof.responses.c).toBe('bigint');
 
             // Public variables should be correctly typed
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'type_safety_test');
             expect(result.isValid).toBe(true);
         });
@@ -346,17 +339,17 @@ describe('Sigma Proof', () => {
             // G is implicit, Q is a commitment not an input
             const variables = { c };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'single_statement_test'
             );
 
-            expect(Object.keys(proof.commitments)).toEqual(['c']);
+            expect(Object.keys(computed)).toEqual(['Q']);
             expect(Object.keys(proof.responses)).toEqual(['c']);
 
-            const publicVariables = { ...commitmentPoints };
+            const publicVariables = { ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'single_statement_test');
             expect(result.isValid).toBe(true);
         });
@@ -369,15 +362,15 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a: zeroA, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'zero_scalar_test'
             );
 
-            expect(commitmentPoints.P.equals(zeroP)).toBe(true);
-            const publicVariables = { H, ...commitmentPoints };
+            expect(computed.P.equals(zeroP)).toBe(true);
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'zero_scalar_test');
             expect(result.isValid).toBe(true);
         });
@@ -388,15 +381,15 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a: largeA, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'large_scalar_test'
             );
 
-            expect(commitmentPoints.P.equals(largeP)).toBe(true);
-            const publicVariables = { H, ...commitmentPoints };
+            expect(computed.P.equals(largeP)).toBe(true);
+            const publicVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'large_scalar_test');
             expect(result.isValid).toBe(true);
         });
@@ -407,15 +400,15 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('Q = G^c');
             const variables = { c: zeroScalar };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'identity_point_test'
             );
 
-            expect(commitmentPoints.Q.equals(identityQ)).toBe(true);
-            const publicVariables = { ...commitmentPoints };
+            expect(computed.Q.equals(identityQ)).toBe(true);
+            const publicVariables = { ...computed };
             const result = verifySigmaProof(protocol, proof, publicVariables, nonce, 'identity_point_test');
             expect(result.isValid).toBe(true);
         });
@@ -424,14 +417,14 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol,
                 variables,
                 encodeUTF8('nonce1'),
                 'nonce_test'
             );
 
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol,
                 variables,
                 encodeUTF8('nonce2'),
@@ -439,12 +432,13 @@ describe('Sigma Proof', () => {
             );
 
             expect(proof1.challenge).not.toEqual(proof2.challenge);
-            expect(proof1.commitments.a.equals(proof2.commitments.a)).toBe(false);
+            // Computed points are the same since they only depend on secrets, not nonce
+            expect(computed1.P.equals(computed2.P)).toBe(true);
             expect(proof1.responses.a).not.toEqual(proof2.responses.a);
 
             // Both proofs should still be valid
-            const publicVariables1 = { H, ...commitmentPoints1 };
-            const publicVariables2 = { H, ...commitmentPoints2 };
+            const publicVariables1 = { H, ...computed1 };
+            const publicVariables2 = { H, ...computed2 };
             expect(verifySigmaProof(protocol, proof1, publicVariables1, encodeUTF8('nonce1'), 'nonce_test').isValid).toBe(true);
             expect(verifySigmaProof(protocol, proof2, publicVariables2, encodeUTF8('nonce2'), 'nonce_test').isValid).toBe(true);
         });
@@ -453,14 +447,14 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'usage1'
             );
 
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -470,8 +464,8 @@ describe('Sigma Proof', () => {
             expect(proof1.challenge).not.toEqual(proof2.challenge);
 
             // Both proofs should still be valid with their respective contexts
-            const publicVariables1 = { H, ...commitmentPoints1 };
-            const publicVariables2 = { H, ...commitmentPoints2 };
+            const publicVariables1 = { H, ...computed1 };
+            const publicVariables2 = { H, ...computed2 };
             expect(verifySigmaProof(protocol, proof1, publicVariables1, nonce, 'usage1').isValid).toBe(true);
             expect(verifySigmaProof(protocol, proof2, publicVariables2, nonce, 'usage2').isValid).toBe(true);
         });
@@ -482,21 +476,21 @@ describe('Sigma Proof', () => {
             const variables = { H, a, b };
 
             // Usage should NOT be normalized - different case/spacing should produce different challenges
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'test_usage'
             );
 
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'TEST_USAGE' // Different case should produce different challenge
             );
 
-            const { proof: proof3, commitmentPoints: commitmentPoints3 } = createSigmaProof(
+            const { proof: proof3, computed: computed3 } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -509,9 +503,9 @@ describe('Sigma Proof', () => {
             expect(proof1.challenge).not.toEqual(proof3.challenge);
 
             // But all should verify correctly with their own contexts
-            const publicVariables1 = { H, ...commitmentPoints1 };
-            const publicVariables2 = { H, ...commitmentPoints2 };
-            const publicVariables3 = { H, ...commitmentPoints3 };
+            const publicVariables1 = { H, ...computed1 };
+            const publicVariables2 = { H, ...computed2 };
+            const publicVariables3 = { H, ...computed3 };
             expect(verifySigmaProof(protocol, proof1, publicVariables1, nonce, 'test_usage').isValid).toBe(true);
             expect(verifySigmaProof(protocol, proof2, publicVariables2, nonce, 'TEST_USAGE').isValid).toBe(true);
             expect(verifySigmaProof(protocol, proof3, publicVariables3, nonce, 'test usage').isValid).toBe(true);
@@ -534,14 +528,14 @@ describe('Sigma Proof', () => {
             const usage = 'test_descriptor';
             
             // Create proofs for both protocols
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol1,
                 { H, a, b },
                 nonce,
                 usage
             );
             
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol2,
                 { H, a, b },
                 nonce,
@@ -549,12 +543,12 @@ describe('Sigma Proof', () => {
             );
             
             // Since descriptors are identical, both proofs should verify with either protocol
-            expect(verifySigmaProof(protocol1, proof1, { H, ...commitmentPoints1 }, nonce, usage).isValid).toBe(true);
-            expect(verifySigmaProof(protocol2, proof2, { H, ...commitmentPoints2 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol1, proof1, { H, ...computed1 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol2, proof2, { H, ...computed2 }, nonce, usage).isValid).toBe(true);
             
             // Cross-verify: since protocols have same descriptor, they should be interchangeable
-            expect(verifySigmaProof(protocol2, proof1, { H, ...commitmentPoints1 }, nonce, usage).isValid).toBe(true);
-            expect(verifySigmaProof(protocol1, proof2, { H, ...commitmentPoints2 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol2, proof1, { H, ...computed1 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol1, proof2, { H, ...computed2 }, nonce, usage).isValid).toBe(true);
         });
 
         it('should produce different descriptors for structurally different protocols', () => {
@@ -582,14 +576,14 @@ describe('Sigma Proof', () => {
             const usage = 'test_structure';
             
             // Create proofs
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol1,
                 { H, a, b },
                 nonce,
                 usage
             );
             
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol2,
                 { a, b },
                 nonce,
@@ -597,8 +591,8 @@ describe('Sigma Proof', () => {
             );
             
             // Verify each proof with its own protocol
-            expect(verifySigmaProof(protocol1, proof1, { H, ...commitmentPoints1 }, nonce, usage).isValid).toBe(true);
-            expect(verifySigmaProof(protocol2, proof2, { ...commitmentPoints2 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol1, proof1, { H, ...computed1 }, nonce, usage).isValid).toBe(true);
+            expect(verifySigmaProof(protocol2, proof2, { ...computed2 }, nonce, usage).isValid).toBe(true);
         });
 
         it('should demonstrate statement normalization protection', () => {
@@ -609,7 +603,7 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a + H^b');
             const variables = { H, a, b };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
@@ -617,7 +611,7 @@ describe('Sigma Proof', () => {
             );
 
             // The proof should verify correctly
-            const publicVariables = { H, ...commitmentPoints };
+            const publicVariables = { H, ...computed };
             expect(verifySigmaProof(protocol, proof, publicVariables, nonce, 'statement_test').isValid).toBe(true);
 
             // The normalization is happening internally in generateChallenge
@@ -634,14 +628,14 @@ describe('Sigma Proof', () => {
 
             // These different usage patterns should produce different challenges
             // even if they might concatenate to similar bytes without length prefixing
-            const { proof: proof1, commitmentPoints: commitmentPoints1 } = createSigmaProof(
+            const { proof: proof1, computed: computed1 } = createSigmaProof(
                 protocol,
                 variables,
                 encodeUTF8('ab'),
                 'test'
             );
 
-            const { proof: proof2, commitmentPoints: commitmentPoints2 } = createSigmaProof(
+            const { proof: proof2, computed: computed2 } = createSigmaProof(
                 protocol,
                 variables,
                 encodeUTF8('a'),
@@ -652,8 +646,8 @@ describe('Sigma Proof', () => {
             expect(proof1.challenge).not.toEqual(proof2.challenge);
 
             // Both should verify correctly
-            const publicVariables1 = { H, ...commitmentPoints1 };
-            const publicVariables2 = { H, ...commitmentPoints2 };
+            const publicVariables1 = { H, ...computed1 };
+            const publicVariables2 = { H, ...computed2 };
             expect(verifySigmaProof(protocol, proof1, publicVariables1, encodeUTF8('ab'), 'test').isValid).toBe(true);
             expect(verifySigmaProof(protocol, proof2, publicVariables2, encodeUTF8('a'), 'testb').isValid).toBe(true);
         });
@@ -665,14 +659,14 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a');
             const variables = { a };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'discrete_log_proof'
             );
 
-            const verificationVariables = { ...commitmentPoints };
+            const verificationVariables = { ...computed };
             const result = verifySigmaProof(protocol, proof, verificationVariables, nonce, 'discrete_log_proof');
             expect(result.isValid).toBe(true);
         });
@@ -686,15 +680,15 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^v + H^r');
             const variables = { H, v: value, r: randomness };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'pedersen_commitment_proof'
             );
 
-            expect(commitmentPoints.P.equals(commitment)).toBe(true);
-            const verificationVariables = { H, ...commitmentPoints };
+            expect(computed.P.equals(commitment)).toBe(true);
+            const verificationVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, verificationVariables, nonce, 'pedersen_commitment_proof');
             expect(result.isValid).toBe(true);
         });
@@ -708,16 +702,16 @@ describe('Sigma Proof', () => {
             const protocol = sigmaProtocol('P = G^a', 'Q = H^a');
             const variables = { H, a: testA };
 
-            const { proof, commitmentPoints } = createSigmaProof(
+            const { proof, computed } = createSigmaProof(
                 protocol,
                 variables,
                 nonce,
                 'equal_discrete_log_proof'
             );
 
-            expect(commitmentPoints.P.equals(testP)).toBe(true);
-            expect(commitmentPoints.Q.equals(testQ)).toBe(true);
-            const verificationVariables = { H, ...commitmentPoints };
+            expect(computed.P.equals(testP)).toBe(true);
+            expect(computed.Q.equals(testQ)).toBe(true);
+            const verificationVariables = { H, ...computed };
             const result = verifySigmaProof(protocol, proof, verificationVariables, nonce, 'equal_discrete_log_proof');
             expect(result.isValid).toBe(true);
         });
