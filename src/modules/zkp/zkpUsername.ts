@@ -4,6 +4,7 @@ import { encodeBigInt32 } from "../formats/bigint";
 import { encodeUsername } from "./utils/encodeUsername";
 import { concatBytes } from "../formats/bytes";
 import { deriveScalar } from "../algebraic/math/scalar";
+import { randomBytes } from "../crypto/randomKey";
 
 /**
  * Hashes and proofs knowledge of a username using Signal's algorithm.
@@ -27,10 +28,8 @@ export function zkUsernameProof(nickname: string, discriminator: number): Uint8A
     const discriminatorScalar = BigInt(discriminator);
     const hashScalar = deriveScalar(concatBytes(encodeBigInt32(nicknameScalar), encodeBigInt32(discriminatorScalar)), 'signal_username_hash');
 
-    // Calculate nonce
-    // NOTE: We dont really need nonce since all scalars are already included in entropy anyway
-    //       but lets keep it for consistency and original signal implementation
-    const nonce = encodeBigInt32(hashScalar);
+    // Random nonce
+    const nonce = randomBytes(32);
 
     // Calculate proof
     const { proof } = PROTOCOL.prove({

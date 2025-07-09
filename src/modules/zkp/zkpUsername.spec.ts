@@ -25,12 +25,17 @@ describe('zkpUsername', () => {
             expect(proof2).not.toEqual(proof3);
         });
         
-        it('should produce consistent proofs', () => {
+        it('should produce different proofs for same username', () => {
             const proof1 = zkUsernameProof('testuser', 123);
             const proof2 = zkUsernameProof('testuser', 123);
             
-            // Proofs should be deterministic for same inputs
-            expect(proof1).toEqual(proof2);
+            // Proofs should be different due to random nonce
+            expect(proof1).not.toEqual(proof2);
+            
+            // But they should yield the same hash
+            const hash1 = zkUsernameVerify(proof1);
+            const hash2 = zkUsernameVerify(proof2);
+            expect(hash1).toEqual(hash2);
         });
         
         it('should handle edge cases', () => {
@@ -70,13 +75,21 @@ describe('zkpUsername', () => {
         });
         
         it('should return consistent hashes for same username', () => {
-            const proof1 = zkUsernameProof('alice', 42);
-            const proof2 = zkUsernameProof('alice', 42);
+            // Generate multiple proofs for the same username
+            const proofs = Array.from({ length: 5 }, () => zkUsernameProof('alice', 42));
             
-            const hash1 = zkUsernameVerify(proof1);
-            const hash2 = zkUsernameVerify(proof2);
+            // All proofs should be different
+            for (let i = 0; i < proofs.length - 1; i++) {
+                expect(proofs[i]).not.toEqual(proofs[i + 1]);
+            }
             
-            expect(hash1).toEqual(hash2);
+            // But all should verify to the same hash
+            const hashes = proofs.map(proof => zkUsernameVerify(proof));
+            const firstHash = hashes[0];
+            
+            for (const hash of hashes) {
+                expect(hash).toEqual(firstHash);
+            }
         });
         
         it('should return different hashes for different usernames', () => {
@@ -171,6 +184,20 @@ describe('zkpUsername', () => {
             // - 1 computed point H (32 bytes)
             const expectedSize = 32 + (3 * 32) + 32;
             expect(proof.length).toBe(expectedSize);
+        });
+        
+        it('should produce non-deterministic proofs', () => {
+            // Create 10 proofs for the same username
+            const proofs = Array.from({ length: 10 }, () => zkUsernameProof('test_user', 999));
+            
+            // All proofs should be unique
+            const uniqueProofs = new Set(proofs.map(p => Buffer.from(p).toString('hex')));
+            expect(uniqueProofs.size).toBe(10);
+            
+            // But all should produce the same hash
+            const hashes = proofs.map(proof => zkUsernameVerify(proof));
+            const uniqueHashes = new Set(hashes.map(h => Buffer.from(h!).toString('hex')));
+            expect(uniqueHashes.size).toBe(1);
         });
     });
 });
