@@ -1,4 +1,4 @@
-import { exportBigInt, importBigInt } from '../encoding/bigint';
+import { encodeBigInt32, decodeBigInt32 } from '../../formats/bigint';
 import { Point } from '../math/point';
 import {
     sigmaProtocol,
@@ -111,40 +111,57 @@ export class Sigma<
     /**
      * Creates a proof for this sigma protocol.
      * 
-     * @param nonce - A unique nonce for this proof
-     * @param variables - The secret scalars and generator points
+     * @param opts - Options for creating the proof
+     * @param opts.nonce - A unique nonce for this proof
+     * @param opts.message - The message to bind to the proof (optional)
+     * @param opts.variables - The secret scalars and generator points
+     * 
      * @returns Serialized proof bytes including computed points
      * 
      * @example
      * ```typescript
      * // With variables
      * const sigma = Sigma.create('P = G^a + H^b');
-     * const proofBytes = sigma.prove(nonce, { H: generatorH, a: secretA, b: secretB });
+     * const proofBytes = sigma.prove({ 
+     *     nonce, 
+     *     message: null,
+     *     variables: { H: generatorH, a: secretA, b: secretB }
+     * });
      * 
      * // Without variables (when all points are predefined and only scalars needed)
      * const sigma = Sigma.create('P = G^a + H^b').withValue('H', H);
-     * const proofBytes = sigma.prove(nonce, { a: secretA, b: secretB });
+     * const proofBytes = sigma.prove({ 
+     *     nonce, 
+     *     variables: { a: secretA, b: secretB }
+     * });
      * ```
      */
-    prove(
-        nonce: Uint8Array,
-        ...args: Exclude<keyof Omit<ProtocolInputVariables<typeof this.protocol>, TPredefined>, never> extends never
-            ? [variables?: {}]
-            : [variables: Omit<ProtocolInputVariables<typeof this.protocol>, TPredefined>]
-    ): Uint8Array {
-        const variables = args[0] as Omit<ProtocolInputVariables<typeof this.protocol>, TPredefined> | undefined;
+    prove = (opts: {
+        nonce: Uint8Array;
+        message?: Uint8Array | null;
+    } & (Exclude<TScalars | Exclude<TPoints, TPredefined>, never> extends never
+        ? { variables?: {} }
+        : {
+            variables:
+            { [K in TScalars]: bigint } &
+            { [K in Exclude<TPoints, TPredefined>]: Point }
+        })
+    ): { proof: Uint8Array, computed: { [K in TCommitments]: Point } } => {
+        const { nonce, message = null } = opts;
+        const variables = ('variables' in opts ? opts.variables : {}) as any;
         // Combine user-provided variables with predefined values
         const allVariables = {
             ...this.predefinedValues,
             ...(variables || {})
         } as unknown as ProtocolInputVariables<typeof this.protocol>;
 
-        const { proof, computed } = createSigmaProof(
-            this.protocol,
-            allVariables,
+        const { proof, computed } = createSigmaProof({
+            protocol: this.protocol,
+            variables: allVariables,
             nonce,
-            this.usage
-        );
+            message: message || new Uint8Array(),
+            usage: this.usage
+        });
 
         // Serialize the proof:
         // - challenge (32 bytes)
@@ -155,12 +172,12 @@ export class Sigma<
         let offset = 0;
 
         // Write challenge
-        output.set(exportBigInt(proof.challenge), offset);
+        output.set(encodeBigInt32(proof.challenge), offset);
         offset += 32;
 
         // Write responses in order
         for (const scalarName of this.scalars) {
-            output.set(exportBigInt(proof.responses[scalarName as TScalars]), offset);
+            output.set(encodeBigInt32(proof.responses[scalarName as TScalars]), offset);
             offset += 32;
         }
 
@@ -171,69 +188,84 @@ export class Sigma<
             offset += 32;
         }
 
-        return output;
+        return {
+            proof: output,
+            computed: computed as { [K in TCommitments]: Point }
+        }
     }
 
     /**
      * Verifies a proof for this sigma protocol.
      * 
-     * @param proofBytes - The serialized proof bytes
-     * @param nonce - The nonce used to create the proof
-     * @param publicVariables - Optional public generator points (not including computed points from proof)
+     * @param opts - Options for verifying the proof
+     * @param opts.proofBytes - The serialized proof bytes
+     * @param opts.nonce - The nonce used to create the proof
+     * @param opts.message - The message bound to the proof (optional)
+     * @param opts.publicVariables - Optional public generator points (not including computed points from proof)
      * @returns True if the proof is valid, false otherwise
      * 
      * @example
      * ```typescript
      * // With public variables
-     * const isValid = sigma.verify(proofBytes, nonce, { H: generatorH });
+     * const isValid = sigma.verify({ 
+     *     proofBytes, 
+     *     nonce,
+     *     message: null,
+     *     publicVariables: { H: generatorH }
+     * });
      * 
      * // Without public variables (when all points are predefined)
-     * const isValid = sigma.verify(proofBytes, nonce);
+     * const isValid = sigma.verify({ 
+     *     proofBytes, 
+     *     nonce
+     * });
      * ```
      */
-    verify(
-        proofBytes: Uint8Array,
-        nonce: Uint8Array,
-        ...args: Exclude<TPoints, TPredefined> extends never
-            ? [publicVariables?: {}]
-            : [publicVariables: Omit<{ [K in TPoints]: Point }, Extract<TPredefined, TPoints>>]
-    ): boolean {
-        const publicVariables = args[0] as Omit<{ [K in TPoints]: Point }, Extract<TPredefined, TPoints>> | undefined;
+    verify = (
+        opts: {
+            proof: Uint8Array;
+            message?: Uint8Array | null;
+        } & (Exclude<TPoints, TPredefined> extends never
+            ? { variables?: {} }
+            : { variables: Omit<{ [K in TPoints]: Point }, Extract<TPredefined, TPoints>> })
+    ): { computed: { [K in TCommitments]: Point } } | null => {
+        const { proof, message = null } = opts;
+        const variables = ('variables' in opts ? opts.variables : {}) as Omit<{ [K in TPoints]: Point }, Extract<TPredefined, TPoints>> | undefined;
         // Deserialize the proof
         const expectedSize = 32 + (this.scalars.length * 32) + (this.commitments.length * 32);
-        if (proofBytes.length !== expectedSize) {
-            return false;
+        if (proof.length !== expectedSize) {
+            return null;
         }
 
         let offset = 0;
 
         // Read challenge
-        const challengeBytes = proofBytes.slice(offset, offset + 32);
-        const challenge = importBigInt(challengeBytes);
+        const challengeBytes = proof.slice(offset, offset + 32);
+        const challenge = decodeBigInt32(challengeBytes);
         offset += 32;
 
         // Read responses
         const responses: { [key: string]: bigint } = {};
         for (const scalarName of this.scalars) {
-            const responseBytes = proofBytes.slice(offset, offset + 32);
-            responses[scalarName] = importBigInt(responseBytes);
+            const responseBytes = proof.slice(offset, offset + 32);
+            responses[scalarName] = decodeBigInt32(responseBytes);
             offset += 32;
         }
 
         // Read computed points
         const computedPoints: { [key: string]: Point } = {};
         for (const commitmentName of this.commitments) {
-            const pointBytes = proofBytes.slice(offset, offset + 32);
+            const pointBytes = proof.slice(offset, offset + 32);
             try {
                 computedPoints[commitmentName] = Point.fromBytes(pointBytes);
             } catch {
-                return false;
+                return null;
             }
             offset += 32;
         }
 
         // Construct the proof object
-        const proof: SigmaProof<TScalars> = {
+        const proofObject: SigmaProof<TScalars> = {
             challenge,
             responses: responses as { [K in TScalars]: bigint }
         };
@@ -241,19 +273,23 @@ export class Sigma<
         // Combine predefined points, public variables, and computed points for verification
         const allVariables = {
             ...this.predefinedValues,
-            ...(publicVariables || {}),
+            ...(variables || {}),
             ...computedPoints
         } as unknown as ProtocolVerificationVariables<typeof this.protocol>;
 
-        const result = verifySigmaProof(
-            this.protocol,
-            proof,
-            allVariables,
-            nonce,
-            this.usage
-        );
+        const result = verifySigmaProof({
+            protocol: this.protocol,
+            proof: proofObject,
+            variables: allVariables,
+            message: message || new Uint8Array(),
+            usage: this.usage
+        });
 
-        return result.isValid;
+        if (result.isValid) {
+            return { computed: computedPoints as { [K in TCommitments]: Point } };
+        }
+
+        return null;
     }
 
     /**
@@ -262,7 +298,7 @@ export class Sigma<
      * @param usage - The new usage string
      * @returns A new Sigma instance
      */
-    withUsage(usage: string): Sigma<TScalars, TPoints, TCommitments, TPredefined> {
+    withUsage = (usage: string): Sigma<TScalars, TPoints, TCommitments, TPredefined> => {
         return new Sigma(this.protocol, usage, this.predefinedValues);
     }
 
@@ -282,10 +318,10 @@ export class Sigma<
      * const proof = sigma.prove({ a, b }, nonce);
      * ```
      */
-    withValue<K extends TPoints>(
+    withValue = <K extends TPoints>(
         name: K,
         value: Point
-    ): Sigma<TScalars, TPoints, TCommitments, TPredefined | K> {
+    ): Sigma<TScalars, TPoints, TCommitments, TPredefined | K> => {
         // Check if the variable exists in the protocol as a point
         const isPoint = this.protocol.points.includes(name as any);
 

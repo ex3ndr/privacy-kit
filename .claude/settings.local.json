@@ -10,7 +10,8 @@
       "Bash(node:*)",
       "Bash(npm run typecheck:*)",
       "Bash(yarn tsc:*)",
-      "Bash(yarn typecheck)"
+      "Bash(yarn typecheck)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }

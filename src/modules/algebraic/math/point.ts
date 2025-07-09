@@ -1,4 +1,4 @@
-import { encodeBigInt } from "@/modules/algebraic/encoding/bigint";
+import { encodeBigInt, encodeBigInt32 } from "@/modules/formats/bigint";
 import { padBytes } from "@/modules/formats/bytes";
 import { encodeUTF8 } from "@/modules/formats/text";
 import { ed25519, hashToRistretto255, RistrettoPoint } from "@noble/curves/ed25519";
@@ -24,9 +24,9 @@ export class Point {
         if (typeof src === 'string') {
             v = encodeUTF8(src);
         } else if (typeof src === 'number') {
-            v = encodeBigInt(BigInt(src));
+            v = encodeBigInt32(src);
         } else if (typeof src === 'bigint') {
-            v = encodeBigInt(src);
+            v = encodeBigInt32(src);
         } else {
             v = src;
         }
@@ -35,6 +35,10 @@ export class Point {
 
     static encodeScalar(scalar: bigint) {
         return new Point(RistrettoPoint.hashToCurve(padBytes(encodeBigInt(scalar), 64)));
+    }
+
+    static encodeBytes(data: Uint8Array) {
+        return new Point(RistrettoPoint.hashToCurve(padBytes(data, 64)));
     }
 
     static fromBytes(bytes: Uint8Array) {

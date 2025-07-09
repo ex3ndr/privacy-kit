@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import { Point } from './point';
 import { concatBytes } from '@/modules/formats/bytes';
 import { deriveKey } from '@/modules/crypto/deriveKey';
-import { decodeBigInt } from '../encoding/bigint';
+import { decodeBigInt } from '../../formats/bigint';
 
 /**
  * Generates a cryptographically secure random scalar with a specified modulus.

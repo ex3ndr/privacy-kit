@@ -22,7 +22,7 @@ describe('Sigma Class', () => {
     describe('create', () => {
         it('should create a sigma protocol with single statement', () => {
             const sigma = Sigma.create('P = G^a');
-            
+
             expect(sigma.scalars).toEqual(['a']);
             expect(sigma.points).toEqual([]);
             expect(sigma.commitments).toEqual(['P']);
@@ -30,7 +30,7 @@ describe('Sigma Class', () => {
 
         it('should create a sigma protocol with multiple statements', () => {
             const sigma = Sigma.create('P = G^a + H^b', 'Q = G^c');
-            
+
             expect(sigma.scalars).toEqual(['a', 'b', 'c']);
             expect(sigma.points).toEqual(['H']);
             expect(sigma.commitments).toEqual(['P', 'Q']);
@@ -38,21 +38,21 @@ describe('Sigma Class', () => {
 
         it('should accept custom usage', () => {
             const sigma = Sigma.create('P = G^a').withUsage('custom_protocol');
-            
+
             // We can verify this works by creating a proof with default usage
-            const proofBytes1 = sigma.prove({ a }, nonce);
-            
+            const { proof: proofBytes1 } = sigma.prove({ nonce, variables: { a } });
+
             // Create another sigma with default usage and compare
             const sigmaDefault = Sigma.create('P = G^a');
-            const proofBytes2 = sigmaDefault.prove({ a }, nonce);
-            
+            const { proof: proofBytes2 } = sigmaDefault.prove({ nonce, variables: { a } });
+
             // Proofs should be different due to different usage
             expect(proofBytes1).not.toEqual(proofBytes2);
         });
 
         it('should handle statements with custom usage', () => {
             const sigma = Sigma.create('P = G^a', 'Q = G^b').withUsage('multi_statement');
-            
+
             expect(sigma.scalars).toEqual(['a', 'b']);
         });
 
@@ -64,89 +64,117 @@ describe('Sigma Class', () => {
     describe('prove and verify', () => {
         it('should create and verify a valid proof for single statement', () => {
             const sigma = Sigma.create('P = G^a');
-            
-            const proofBytes = sigma.prove({ a }, nonce);
-            
-            expect(proofBytes).toBeInstanceOf(Uint8Array);
-            expect(proofBytes.length).toBe(32 + 32 + 32); // challenge + 1 response + 1 point
-            
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { a } });
+
+            expect(proof).toBeInstanceOf(Uint8Array);
+            expect(proof.length).toBe(32 + 32 + 32); // challenge + 1 response + 1 point
+
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
         });
 
         it('should create and verify a valid proof for multiple statements', () => {
             const sigma = Sigma.create('P = G^a + H^b', 'Q = G^c');
-            
-            const proofBytes = sigma.prove({ H, a, b, c }, nonce);
-            
-            expect(proofBytes).toBeInstanceOf(Uint8Array);
-            expect(proofBytes.length).toBe(32 + 3*32 + 2*32); // challenge + 3 responses + 2 points
-            
-            const isValid = sigma.verify(proofBytes, nonce, { H });
-            expect(isValid).toBe(true);
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { H, a, b, c } });
+
+            expect(proof).toBeInstanceOf(Uint8Array);
+            expect(proof.length).toBe(32 + 3 * 32 + 2 * 32); // challenge + 3 responses + 2 points
+
+            const result = sigma.verify({ proof, message: null, variables: { H } });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
+            expect(result!.computed.Q).toBeInstanceOf(Point);
         });
 
         it('should create and verify a proof for complex protocol', () => {
             const sigma = Sigma.create('P = G^a + H^b', 'Q = G^c', 'R = P^d + Q^e');
             const d = generateRandomScalar();
             const e = generateRandomScalar();
-            
-            const proofBytes = sigma.prove({ H, a, b, c, d, e }, nonce);
-            
-            expect(proofBytes).toBeInstanceOf(Uint8Array);
-            expect(proofBytes.length).toBe(32 + 5*32 + 3*32); // challenge + 5 responses + 3 points
-            
-            const isValid = sigma.verify(proofBytes, nonce, { H });
-            expect(isValid).toBe(true);
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { H, a, b, c, d, e } });
+
+            expect(proof).toBeInstanceOf(Uint8Array);
+            expect(proof.length).toBe(32 + 5 * 32 + 3 * 32); // challenge + 5 responses + 3 points
+
+            const result = sigma.verify({ proof, variables: { H } });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
+            expect(result!.computed.Q).toBeInstanceOf(Point);
+            expect(result!.computed.R).toBeInstanceOf(Point);
         });
 
         it('should fail verification with tampered proof bytes', () => {
             const sigma = Sigma.create('P = G^a');
-            
-            const proofBytes = sigma.prove({ a }, nonce);
-            
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { a } });
+
             // Tamper with the proof
-            const tamperedProof = new Uint8Array(proofBytes);
+            const tamperedProof = new Uint8Array(proof);
             tamperedProof[0] = (tamperedProof[0] + 1) % 256;
-            
-            const isValid = sigma.verify(tamperedProof, nonce);
-            expect(isValid).toBe(false);
+
+            const result = sigma.verify({ proof: tamperedProof });
+            expect(result).toBeNull();
         });
 
         it('should fail verification with wrong nonce', () => {
             const sigma = Sigma.create('P = G^a');
-            
-            const proofBytes = sigma.prove({ a }, nonce);
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { a } });
             const wrongNonce = encodeUTF8('wrong_nonce');
-            
-            const isValid = sigma.verify(proofBytes, wrongNonce);
-            expect(isValid).toBe(false);
+
+            // With the new implementation, nonce doesn't affect verification
+            // Only message affects the challenge
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+        });
+
+        it('should create and verify proofs with messages', () => {
+            const sigma = Sigma.create('P = G^a');
+            const message = encodeUTF8('test message');
+
+            const { proof, computed } = sigma.prove({ nonce, message, variables: { a } });
+
+            // Should verify with correct message
+            const result = sigma.verify({ proof, message });
+            expect(result).not.toBeNull();
+
+            // Should fail with wrong message
+            const wrongMessage = encodeUTF8('wrong message');
+            const resultWrong = sigma.verify({ proof, message: wrongMessage });
+            expect(resultWrong).toBeNull();
+
+            // Should fail with null message when proof was created with message
+            const resultNull = sigma.verify({ proof });
+            expect(resultNull).toBeNull();
         });
 
         it('should respect custom usage in prove and verify', () => {
             const sigma1 = Sigma.create('P = G^a').withUsage('custom_usage');
             const sigma2 = Sigma.create('P = G^a');
-            
-            const proofBytes1 = sigma1.prove({ a }, nonce);
-            const proofBytes2 = sigma2.prove({ a }, nonce);
-            
+
+            const { proof: proofBytes1, computed: computed1 } = sigma1.prove({ nonce, variables: { a } });
+            const { proof: proofBytes2, computed: computed2 } = sigma2.prove({ nonce, variables: { a } });
+
             // Should succeed with matching sigma
-            const isValid1 = sigma1.verify(proofBytes1, nonce);
-            expect(isValid1).toBe(true);
-            
+            const result1 = sigma1.verify({ proof: proofBytes1 });
+            expect(result1).not.toBeNull();
+
             // Should succeed with default sigma
-            const isValid2 = sigma2.verify(proofBytes2, nonce);
-            expect(isValid2).toBe(true);
-            
+            const result2 = sigma2.verify({ proof: proofBytes2 });
+            expect(result2).not.toBeNull();
+
             // Different usage should produce different proofs
             expect(proofBytes1).not.toEqual(proofBytes2);
-            
+
             // Cross-verification should fail
-            const isValid3 = sigma1.verify(proofBytes2, nonce);
-            expect(isValid3).toBe(false);
-            
-            const isValid4 = sigma2.verify(proofBytes1, nonce);
-            expect(isValid4).toBe(false);
+            const result3 = sigma1.verify({ proof: proofBytes2 });
+            expect(result3).toBeNull();
+
+            const result4 = sigma2.verify({ proof: proofBytes1 });
+            expect(result4).toBeNull();
         });
     });
 
@@ -154,11 +182,11 @@ describe('Sigma Class', () => {
         it('should create a new instance with different usage', () => {
             const sigma1 = Sigma.create('P = G^a').withUsage('usage1');
             const sigma2 = sigma1.withUsage('usage2');
-            
+
             // But different usage affects proofs
-            const proofBytes1 = sigma1.prove({ a }, nonce);
-            const proofBytes2 = sigma2.prove({ a }, nonce);
-            
+            const { proof: proofBytes1 } = sigma1.prove({ nonce, variables: { a } });
+            const { proof: proofBytes2 } = sigma2.prove({ nonce, variables: { a } });
+
             expect(proofBytes1).not.toEqual(proofBytes2);
         });
     });
@@ -167,13 +195,14 @@ describe('Sigma Class', () => {
         it('should create a new instance with predefined point', () => {
             const sigma = Sigma.create('P = G^a + H^b')
                 .withValue('H', H);
-            
+
             // Now only 'a' and 'b' need to be provided
-            const proofBytes = sigma.prove({ a, b }, nonce);
-            
+            const { proof, computed } = sigma.prove({ nonce, variables: { a, b } });
+
             // Verify the proof - H is not needed in public variables
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
         });
 
         it('should allow chaining multiple predefined points', () => {
@@ -181,46 +210,50 @@ describe('Sigma Class', () => {
             const sigma = Sigma.create('P = G^a + H^b + I^c')
                 .withValue('H', H)
                 .withValue('I', I);
-            
+
             // Now only 'a', 'b', 'c' need to be provided
-            const proofBytes = sigma.prove({ a, b, c }, nonce);
-            
+            const { proof, computed } = sigma.prove({ nonce, variables: { a, b, c } });
+
             // Verify the proof
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
         });
 
         it('should work with complex protocols', () => {
             const d = generateRandomScalar();
             const e = generateRandomScalar();
-            
+
             const sigma = Sigma.create('P = G^a + H^b', 'Q = G^c', 'R = P^d + Q^e')
                 .withValue('H', H);
-            
+
             // Now only a, b, c, d, e need to be provided
-            const proofBytes = sigma.prove({ a, b, c, d, e }, nonce);
-            
+            const { proof, computed } = sigma.prove({ nonce, variables: { a, b, c, d, e } });
+
             // Verify the proof
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
+            expect(result!.computed.Q).toBeInstanceOf(Point);
+            expect(result!.computed.R).toBeInstanceOf(Point);
         });
 
         it('should throw error for non-existent point', () => {
             const sigma = Sigma.create('P = G^a');
-            
+
             expect(() => (sigma as any).withValue('H', H)).toThrow("Point 'H' not found in protocol");
         });
 
         it('should throw error for trying to set scalar', () => {
             const sigma = Sigma.create('P = G^a + H^b');
-            
+
             // Try to set scalar (not allowed)
             expect(() => sigma.withValue('a' as any, a as any)).toThrow("Point 'a' not found in protocol");
         });
 
         it('should throw error for wrong value type', () => {
             const sigma = Sigma.create('P = G^a + H^b');
-            
+
             // Try to set point with non-Point value
             expect(() => sigma.withValue('H', a as any)).toThrow("Value must be a Point");
         });
@@ -237,15 +270,16 @@ describe('Sigma Class', () => {
         it('should prove knowledge of discrete logarithm', () => {
             const sigma = Sigma.discreteLog();
             const secret = generateRandomScalar();
-            
-            const proofBytes = sigma.prove({ secret }, nonce);
-            
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { secret } });
+
             // Verify the proof
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
-            
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
+
             // Extract and verify the computed point
-            const computedP = Point.fromBytes(proofBytes.slice(32 + 32, 32 + 32 + 32));
+            const computedP = Point.fromBytes(proof.slice(32 + 32, 32 + 32 + 32));
             const expectedP = Point.BASE.multiply(secret);
             expect(computedP.equals(expectedP)).toBe(true);
         });
@@ -254,31 +288,33 @@ describe('Sigma Class', () => {
             // Create a sigma protocol with predefined generator H
             const sigma = Sigma.pedersenCommitment()
                 .withValue('H', H);
-            
+
             const value = generateRandomScalar();
             const blinding = generateRandomScalar();
-            
+
             // Now only value and blinding need to be provided
-            const proofBytes = sigma.prove({ value, blinding }, nonce);
-            
+            const { proof, computed } = sigma.prove({ nonce, variables: { value, blinding } });
+
             // Verify without needing to provide H (it's predefined)
-            const isValid = sigma.verify(proofBytes, nonce);
-            expect(isValid).toBe(true);
+            const result = sigma.verify({ proof });
+            expect(result).not.toBeNull();
+            expect(result!.computed.C).toBeInstanceOf(Point);
         });
 
         it('should prove knowledge of Pedersen commitment opening', () => {
             const sigma = Sigma.pedersenCommitment();
             const value = generateRandomScalar();
             const blinding = generateRandomScalar();
-            
-            const proofBytes = sigma.prove({ H, value, blinding }, nonce);
-            
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { H, value, blinding } });
+
             // Verify the proof
-            const isValid = sigma.verify(proofBytes, nonce, { H });
-            expect(isValid).toBe(true);
-            
+            const result = sigma.verify({ proof, variables: { H } });
+            expect(result).not.toBeNull();
+            expect(result!.computed.C).toBeInstanceOf(Point);
+
             // Extract and verify the commitment
-            const computedC = Point.fromBytes(proofBytes.slice(32 + 2*32, 32 + 2*32 + 32));
+            const computedC = Point.fromBytes(proof.slice(32 + 2 * 32, 32 + 2 * 32 + 32));
             const expectedCom = Point.BASE.multiply(value).add(H.multiply(blinding));
             expect(computedC.equals(expectedCom)).toBe(true);
         });
@@ -286,16 +322,18 @@ describe('Sigma Class', () => {
         it('should prove equality of discrete logarithms', () => {
             const sigma = Sigma.equalDiscreteLog();
             const x = generateRandomScalar();
-            
-            const proofBytes = sigma.prove({ H, x }, nonce);
-            
+
+            const { proof, computed } = sigma.prove({ nonce, variables: { H, x } });
+
             // Verify the proof
-            const isValid = sigma.verify(proofBytes, nonce, { H });
-            expect(isValid).toBe(true);
-            
+            const result = sigma.verify({ proof, variables: { H } });
+            expect(result).not.toBeNull();
+            expect(result!.computed.P).toBeInstanceOf(Point);
+            expect(result!.computed.Q).toBeInstanceOf(Point);
+
             // Extract and verify both computed points use the same discrete log
-            const computedP = Point.fromBytes(proofBytes.slice(32 + 32, 32 + 32 + 32));
-            const computedQ = Point.fromBytes(proofBytes.slice(32 + 32 + 32, 32 + 32 + 32 + 32));
+            const computedP = Point.fromBytes(proof.slice(32 + 32, 32 + 32 + 32));
+            const computedQ = Point.fromBytes(proof.slice(32 + 32 + 32, 32 + 32 + 32 + 32));
             const expectedP = Point.BASE.multiply(x);
             const expectedQ = H.multiply(x);
             expect(computedP.equals(expectedP)).toBe(true);

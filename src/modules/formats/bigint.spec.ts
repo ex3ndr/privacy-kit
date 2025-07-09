@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodeBigInt, decodeBigInt, exportBigInt } from './bigint';
+import { encodeBigInt, decodeBigInt, encodeBigInt32, decodeBigInt32 } from './bigint';
 
 describe('encodeBigInt', () => {
     it('should encode zero correctly', () => {
@@ -145,14 +145,14 @@ describe('encode/decode roundtrip', () => {
 
 describe('exportBigInt', () => {
     it('should export zero as 32-byte array', () => {
-        const result = exportBigInt(0n);
+        const result = encodeBigInt32(0n);
         expect(result.length).toBe(32);
         expect(result[31]).toBe(0);
         expect(result.every(byte => byte === 0)).toBe(true);
     });
 
     it('should export small numbers with proper padding', () => {
-        const result = exportBigInt(255n);
+        const result = encodeBigInt32(255n);
         expect(result.length).toBe(32);
         expect(result[31]).toBe(255);
         expect(result[30]).toBe(0);
@@ -163,7 +163,7 @@ describe('exportBigInt', () => {
     });
 
     it('should export larger numbers with proper padding', () => {
-        const result = exportBigInt(256n);
+        const result = encodeBigInt32(256n);
         expect(result.length).toBe(32);
         expect(result[31]).toBe(0);
         expect(result[30]).toBe(1);
@@ -176,7 +176,7 @@ describe('exportBigInt', () => {
     it('should export very large numbers correctly', () => {
         // Test with a number that takes exactly 32 bytes
         const largeNumber = 2n ** 256n - 1n;
-        const result = exportBigInt(largeNumber);
+        const result = encodeBigInt32(largeNumber);
         expect(result.length).toBe(32);
         expect(result[0]).toBe(255);
         expect(result[31]).toBe(255);
@@ -184,13 +184,13 @@ describe('exportBigInt', () => {
     });
 
     it('should throw error for negative numbers', () => {
-        expect(() => exportBigInt(-1n)).toThrow("Negative numbers not supported");
-        expect(() => exportBigInt(-255n)).toThrow("Negative numbers not supported");
+        expect(() => encodeBigInt32(-1n)).toThrow("Negative numbers not supported");
+        expect(() => encodeBigInt32(-255n)).toThrow("Negative numbers not supported");
     });
 
     it('should handle edge cases', () => {
         // Test with 1
-        const result1 = exportBigInt(1n);
+        const result1 = encodeBigInt32(1n);
         expect(result1.length).toBe(32);
         expect(result1[31]).toBe(1);
         for (let i = 0; i < 31; i++) {
@@ -198,7 +198,7 @@ describe('exportBigInt', () => {
         }
 
         // Test with max value for one byte
-        const result2 = exportBigInt(255n);
+        const result2 = encodeBigInt32(255n);
         expect(result2.length).toBe(32);
         expect(result2[31]).toBe(255);
         for (let i = 0; i < 31; i++) {
@@ -210,7 +210,7 @@ describe('exportBigInt', () => {
         const testValues = [0n, 1n, 255n, 256n, 65535n, 65536n, 2n ** 64n - 1n, 2n ** 128n - 1n];
         
         for (const value of testValues) {
-            const exported = exportBigInt(value);
+            const exported = encodeBigInt32(value);
             const decoded = decodeBigInt(exported);
             expect(decoded).toBe(value);
         }
@@ -227,7 +227,7 @@ describe('exportBigInt', () => {
         ];
 
         for (const testCase of testCases) {
-            const result = exportBigInt(testCase.value);
+            const result = encodeBigInt32(testCase.value);
             expect(result.length).toBe(32);
             expect(result[31]).toBe(testCase.expectedLastByte || 0xff);
             
@@ -244,8 +244,8 @@ describe('exportBigInt', () => {
     it('should produce consistent results', () => {
         // Same input should always produce same output
         const value = 12345n;
-        const result1 = exportBigInt(value);
-        const result2 = exportBigInt(value);
+        const result1 = encodeBigInt32(value);
+        const result2 = encodeBigInt32(value);
         
         expect(result1).toEqual(result2);
         expect(result1.length).toBe(32);

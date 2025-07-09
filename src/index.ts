@@ -16,8 +16,15 @@ export {
     equalBytes,
     encodeUInt32,
     decodeUInt32,
+    lengthPrefixed,
     ByteReader
 } from './modules/formats/bytes';
+export {
+    encodeBigInt32,
+    decodeBigInt32,
+    encodeBigInt,
+    decodeBigInt
+} from './modules/formats/bigint';
 export {
     encodeBip39,
     decodeBip39
@@ -81,3 +88,7 @@ export {
     createPersistentTokenGenerator,
     createPersistentTokenVerifier
 } from './modules/tokens/persistent';
+export {
+    zkUsernameProof,
+    zkUsernameVerify
+} from './modules/zkp/zkpUsername';

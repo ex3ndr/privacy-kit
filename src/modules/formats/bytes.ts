@@ -45,6 +45,56 @@ export function padBytes(value: Uint8Array, length: number): Uint8Array {
     return concatBytes(value, new Uint8Array(length - value.length));
 }
 
+/**
+ * Encodes a byte array with a variable-length prefix.
+ * - Length 0-127: 1 byte (0xxxxxxx)
+ * - Length 128-16383: 2 bytes (10xxxxxx xxxxxxxx)
+ * - Length 16384-2097151: 3 bytes (110xxxxx xxxxxxxx xxxxxxxx)
+ * - Length 2097152-268435455: 4 bytes (1110xxxx xxxxxxxx xxxxxxxx xxxxxxxx)
+ * 
+ * @param data - The data to prefix with its length
+ * @returns The length-prefixed data
+ */
+export function lengthPrefixed(data: Uint8Array): Uint8Array {
+    const length = data.length;
+    
+    if (length < 0) {
+        throw new Error('Length cannot be negative');
+    }
+    
+    if (length <= 0x7F) {
+        // 1 byte: 0xxxxxxx
+        const prefix = new Uint8Array([length]);
+        return concatBytes(prefix, data);
+    } else if (length <= 0x3FFF) {
+        // 2 bytes: 10xxxxxx xxxxxxxx
+        const prefix = new Uint8Array([
+            0x80 | (length >> 8),
+            length & 0xFF
+        ]);
+        return concatBytes(prefix, data);
+    } else if (length <= 0x1FFFFF) {
+        // 3 bytes: 110xxxxx xxxxxxxx xxxxxxxx
+        const prefix = new Uint8Array([
+            0xC0 | (length >> 16),
+            (length >> 8) & 0xFF,
+            length & 0xFF
+        ]);
+        return concatBytes(prefix, data);
+    } else if (length <= 0xFFFFFFF) {
+        // 4 bytes: 1110xxxx xxxxxxxx xxxxxxxx xxxxxxxx
+        const prefix = new Uint8Array([
+            0xE0 | (length >> 24),
+            (length >> 16) & 0xFF,
+            (length >> 8) & 0xFF,
+            length & 0xFF
+        ]);
+        return concatBytes(prefix, data);
+    } else {
+        throw new Error('Length exceeds maximum value (268435455)');
+    }
+}
+
 //
 // Byte Reader and Writer
 //
