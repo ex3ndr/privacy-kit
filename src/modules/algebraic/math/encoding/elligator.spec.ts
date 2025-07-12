@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { elligatorEncode } from './elligator';
+import { elligatorDecode, elligatorEncode } from './elligator';
+import { generateRandomScalar } from '../scalar';
+import { decodeBigInt32 } from '@/modules/formats/bigint';
 
 function arraysEqual(a: number[], b: number[]): boolean {
     if (a.length !== b.length) return false;
@@ -9,7 +11,7 @@ function arraysEqual(a: number[], b: number[]): boolean {
     return true;
 }
 
-describe('Elligator Encoding', () => {
+describe('elligator', () => {
     it('should match dalek elligator_vs_ristretto_sage test vectors', () => {
         // Test vectors from curve25519-dalek elligator_vs_ristretto_sage test
         const testVectors = [
@@ -222,5 +224,99 @@ describe('Elligator Encoding', () => {
             const compressed = point.toBytes();
             expect(Array.from(compressed)).toEqual(expected);
         }
+    });
+
+    it('should decode encoded points back to field elements', () => {
+        // Test with some known field elements
+        const testValues = [0n, 1n, 2n, 42n, 1337n];
+
+        for (const r0 of testValues) {
+            // Encode to get a point
+            const point = elligatorEncode(r0);
+
+            // Decode to get possible preimages
+            const preimages = elligatorDecode(point);
+
+            // Check that we get up to 8 results
+            expect(preimages.length).toBeLessThanOrEqual(8);
+            expect(preimages.length).toBeGreaterThan(0);
+
+            // Check if any of the valid preimages encode back to the same point
+            let foundMatch = false;
+            for (const preimage of preimages) {
+                if (preimage.isValid) {
+                    try {
+                        const reencoded = elligatorEncode(preimage.value);
+                        if (point.equals(reencoded)) {
+                            foundMatch = true;
+                            break;
+                        }
+                    } catch (e) {
+                        // Some preimages might not be valid for encoding
+                    }
+                }
+            }
+
+            // We should find at least one matching preimage
+            expect(foundMatch).toBe(true);
+        }
+    });
+
+
+    it('should handle random points', () => {
+        for (let i = 0; i < 1000; i++) {
+            // Generate a random scalar
+            const r0 = generateRandomScalar();
+
+            // Encode to get a point
+            const point = elligatorEncode(r0);
+
+            // Decode to get possible preimages
+            const preimages = elligatorDecode(point);
+
+            // Should get some results
+            expect(preimages.length).toBeGreaterThan(0);
+            expect(preimages.length).toBeLessThanOrEqual(8);
+
+            // Count valid preimages
+            const validCount = preimages.filter(p => p.isValid).length;
+            console.log(`Test ${i}: Found ${validCount} valid preimages out of ${preimages.length}`);
+        }
+    });
+
+    it('should return consistent results for the same point', () => {
+        const r0 = 12345n;
+        const point = elligatorEncode(r0);
+
+        // Decode multiple times
+        const results1 = elligatorDecode(point);
+        const results2 = elligatorDecode(point);
+
+        // Should get the same number of results
+        expect(results1.length).toBe(results2.length);
+
+        // Results should be the same
+        for (let i = 0; i < results1.length; i++) {
+            expect(results1[i].value).toBe(results2[i].value);
+            expect(results1[i].isValid).toBe(results2[i].isValid);
+        }
+    });
+
+    it('should handle edge cases', () => {
+        // Test with the identity point
+        const identity = elligatorEncode(0n);
+        const identityPreimages = elligatorDecode(identity);
+
+        expect(identityPreimages.length).toBeGreaterThan(0);
+
+        // Test with a point from a large field element
+        const largeValue = decodeBigInt32(new Uint8Array([
+            168, 27, 92, 74, 203, 42, 48, 117, 170, 109, 234, 14, 45, 169, 188, 205, 21,
+            110, 235, 115, 153, 84, 52, 117, 151, 235, 123, 244, 88, 85, 179, 5,
+        ]));
+        const largePoint = elligatorEncode(largeValue);
+        const largePreimages = elligatorDecode(largePoint);
+
+        expect(largePreimages.length).toBeGreaterThan(0);
     });
 });

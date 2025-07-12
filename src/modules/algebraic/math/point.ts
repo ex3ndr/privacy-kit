@@ -1,7 +1,7 @@
-import { encodeBigInt, encodeBigInt32 } from "@/modules/formats/bigint";
-import { padBytes } from "@/modules/formats/bytes";
+import { encodeBigInt32 } from "@/modules/formats/bigint";
 import { encodeUTF8 } from "@/modules/formats/text";
 import { ed25519, hashToRistretto255, RistrettoPoint } from "@noble/curves/ed25519";
+import { lizardDecode, lizardEncode } from "./encoding/lizard";
 
 type IntPoint = typeof RistrettoPoint.BASE;
 
@@ -33,12 +33,15 @@ export class Point {
         return new Point(hashToRistretto255(v, { DST: dst }));
     }
 
-    static encodeScalar(scalar: bigint) {
-        return new Point(RistrettoPoint.hashToCurve(padBytes(encodeBigInt(scalar), 64)));
+    static encodeBytesToPoint(data: Uint8Array) {
+        if (data.length !== 16) {
+            throw new Error('Must be 16 bytes');
+        }
+        return lizardEncode(data);
     }
 
-    static encodeBytes(data: Uint8Array) {
-        return new Point(RistrettoPoint.hashToCurve(padBytes(data, 64)));
+    static decodePointToBytes(point: Point) {  
+        return lizardDecode(point);
     }
 
     static fromBytes(bytes: Uint8Array) {
@@ -78,8 +81,18 @@ export class Point {
     equals(other: Point) {
         return this.#point.equals(other.#point);
     }
-    
+
     toAffine() {
         return (this.#point as any).ep.toAffine() as { x: bigint, y: bigint };
+    }
+
+    toExtended() {
+        const ep = (this.#point as any).ep;
+        return {
+            X: ep.ex,
+            Y: ep.ey,
+            Z: ep.ez,
+            T: ep.et
+        };
     }
 }
