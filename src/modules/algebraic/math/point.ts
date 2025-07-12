@@ -45,6 +45,14 @@ export class Point {
         return new Point(RistrettoPoint.fromHex(bytes));
     }
 
+    static fromAffine(point: { x: bigint, y: bigint }) {
+        return new Point(RistrettoPoint.fromAffine(point));
+    }
+
+    static fromExtended(point: { X: bigint, Y: bigint, Z: bigint, T: bigint }) {
+        return new Point(new RistrettoPoint(new ed25519.ExtendedPoint(point.X, point.Y, point.Z, point.T)));
+    }
+
     #point: IntPoint;
 
     private constructor(point: IntPoint) {
@@ -69,5 +77,9 @@ export class Point {
 
     equals(other: Point) {
         return this.#point.equals(other.#point);
+    }
+    
+    toAffine() {
+        return (this.#point as any).ep.toAffine() as { x: bigint, y: bigint };
     }
 }
