@@ -15,7 +15,7 @@ export async function createPersistentTokenGenerator(opts: {
         key: opts.seed,
         usage: opts.service + ' Persistent Token'
     })).subarray(0, 32);
-    const publicKey = ed25519.getPublicKey(privateKey);
+    const publicKey = Uint8Array.from(ed25519.getPublicKey(privateKey)) as Bytes;
 
     // Import key
     const key = await jose.importJWK({

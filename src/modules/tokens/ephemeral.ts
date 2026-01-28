@@ -16,7 +16,7 @@ export async function createEphemeralTokenGenerator(opts: {
         key: opts.seed,
         usage: opts.service + ' Ephemeral Token'
     })).subarray(0, 32);
-    const publicKey = ed25519.getPublicKey(privateKey);
+    const publicKey = ed25519.getPublicKey(privateKey) as Bytes;
 
     // Import key
     const key = await jose.importJWK({
