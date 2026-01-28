@@ -10,6 +10,7 @@ import {
     sigmaProtocol,
     type ProtocolVariables
 } from './sigmaDefinition';
+import type { Bytes } from '../../../types';
 
 describe('Sigma Proof', () => {
     let G: Point;
@@ -22,7 +23,7 @@ describe('Sigma Proof', () => {
     let c: bigint;
     let d: bigint;
     let e: bigint;
-    let nonce: Uint8Array;
+    let nonce: Bytes;
 
     beforeEach(() => {
         // Generate test points and scalars

@@ -1,4 +1,5 @@
 import { Point } from '../math/point';
+import type { Bytes } from '../../../types';
 
 // Parsed term structure
 export type ParsedTerm = {
@@ -372,7 +373,7 @@ export type SigmaProtocol<
     scalars: TScalars[];
     points: TPoints[]; // Generator points (right side)
     commitments: TCommitments[]; // Result points (left side)
-    descriptor: Uint8Array;
+    descriptor: Bytes;
 };
 
 // Helper function to create binary descriptor
@@ -380,7 +381,7 @@ function createBinaryDescriptor(
     statements: Statement<string>[],
     points: string[],
     scalars: string[]
-): Uint8Array {
+): Bytes {
     // Use the order as provided (no sorting)
     // Create index maps based on order of appearance
     const pointIndexMap = new Map<string, number>();

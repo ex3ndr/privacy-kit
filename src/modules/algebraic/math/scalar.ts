@@ -3,6 +3,7 @@ import { Point } from './point';
 import { concatBytes } from '@/modules/formats/bytes';
 import { deriveKey } from '@/modules/crypto/deriveKey';
 import { decodeBigInt } from '../../formats/bigint';
+import type { Bytes } from '../../../types';
 
 /**
  * Generates a cryptographically secure random scalar with a specified modulus.
@@ -64,7 +65,7 @@ export function isValidScalar(scalar: bigint, modulus: bigint): boolean {
     return scalar >= 0n && scalar < modulus;
 }
 
-export function deriveScalar(seed: Uint8Array, usage: string, modulus?: bigint) {
+export function deriveScalar(seed: Bytes, usage: string, modulus?: bigint) {
     const idEntropy = concatBytes(
         deriveKey(seed, 'Scalar Derive For ' + usage, ['0']),
         deriveKey(seed, 'Scalar Derive For ' + usage, ['1'])

@@ -14,6 +14,7 @@ import {
     verifySigmaProof,
     type SigmaProof
 } from './sigmaProof';
+import type { Bytes } from '../../../types';
 
 /**
  * Sigma class provides a high-level interface for creating and working with sigma protocols.
@@ -137,8 +138,8 @@ export class Sigma<
      * ```
      */
     prove = (opts: {
-        nonce: Uint8Array;
-        message?: Uint8Array | null;
+        nonce: Bytes;
+        message?: Bytes | null;
     } & (Exclude<TScalars | Exclude<TPoints, TPredefined>, never> extends never
         ? { variables?: {} }
         : {
@@ -146,7 +147,7 @@ export class Sigma<
             { [K in TScalars]: bigint } &
             { [K in Exclude<TPoints, TPredefined>]: Point }
         })
-    ): { proof: Uint8Array, computed: { [K in TCommitments]: Point } } => {
+    ): { proof: Bytes, computed: { [K in TCommitments]: Point } } => {
         const { nonce, message = null } = opts;
         const variables = ('variables' in opts ? opts.variables : {}) as any;
         // Combine user-provided variables with predefined values
@@ -223,8 +224,8 @@ export class Sigma<
      */
     verify = (
         opts: {
-            proof: Uint8Array;
-            message?: Uint8Array | null;
+            proof: Bytes;
+            message?: Bytes | null;
         } & (Exclude<TPoints, TPredefined> extends never
             ? { variables?: {} }
             : { variables: Omit<{ [K in TPoints]: Point }, Extract<TPredefined, TPoints>> })

@@ -1,8 +1,10 @@
-export function encodeUTF8(value: string) {
+import type { Bytes } from "../../types";
+
+export function encodeUTF8(value: string): Bytes {
     return new TextEncoder().encode(value);
 }
 
-export function decodeUTF8(value: Uint8Array) {
+export function decodeUTF8(value: Bytes) {
     return new TextDecoder().decode(value);
 }
 

@@ -1,4 +1,6 @@
-export function encodeBigInt(value: bigint | number): Uint8Array {
+import type { Bytes } from '../../types';
+
+export function encodeBigInt(value: bigint | number): Bytes {
     if (value < 0n) {
         throw new Error("Negative numbers not supported");
     }
@@ -27,7 +29,7 @@ export function encodeBigInt(value: bigint | number): Uint8Array {
     }
 }
 
-export function decodeBigInt(value: Uint8Array): bigint {
+export function decodeBigInt(value: Bytes): bigint {
     if (value.length === 0) {
         return 0n;
     }
@@ -41,7 +43,7 @@ export function decodeBigInt(value: Uint8Array): bigint {
     return result;
 }
 
-export function encodeBigInt32(value: bigint | number): Uint8Array {
+export function encodeBigInt32(value: bigint | number): Bytes {
     if (value < 0n) {
         throw new Error("Negative numbers not supported");
     }
@@ -59,7 +61,7 @@ export function encodeBigInt32(value: bigint | number): Uint8Array {
     return result;
 }
 
-export function decodeBigInt32(value: Uint8Array): bigint {
+export function decodeBigInt32(value: Bytes): bigint {
     if (value.length !== 32) {
         throw new Error("importBigInt expects exactly 32 bytes");
     }

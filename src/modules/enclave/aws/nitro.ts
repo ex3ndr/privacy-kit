@@ -5,24 +5,25 @@ import { encodeHex } from "../../formats/hex";
 import { verifyNitroChain } from "./impl/nitro_verify";
 import { createSignedBundle } from "./impl/nitro_verify";
 import { verifyNitroSignature } from "./impl/nitro_verify";
+import type { Bytes } from "../../../types";
 
 export type NitroEnclaveAttestationDocument = {
     moduleId: string
     timestamp: number,
     pcrs: Record<number, string>,
-    nonce: Uint8Array | null,
-    userData: Uint8Array | null,
-    publicKey: Uint8Array | null,
+    nonce: Bytes | null,
+    userData: Bytes | null,
+    publicKey: Bytes | null,
 }
 
 export type NitroEnclaveAttestation = {
     raw: {
-        headerProtected: Uint8Array;
+        headerProtected: Bytes;
         headerUnprotected: any;
-        message: Uint8Array;
-        signature: Uint8Array;
-        cabundle: Uint8Array[];
-        certificate: Uint8Array;
+        message: Bytes;
+        signature: Bytes;
+        cabundle: Bytes[];
+        certificate: Bytes;
     },
     document: NitroEnclaveAttestationDocument
 }

@@ -2,6 +2,7 @@ import { encodeBigInt32 } from "@/modules/formats/bigint";
 import { encodeUTF8 } from "@/modules/formats/text";
 import { ed25519, hashToRistretto255, RistrettoPoint } from "@noble/curves/ed25519";
 import { lizardDecode, lizardEncode } from "./encoding/lizard";
+import type { Bytes } from "../../../types";
 
 type IntPoint = typeof RistrettoPoint.BASE;
 
@@ -19,8 +20,8 @@ export class Point {
         return r;
     }
 
-    static fromHash(src: Uint8Array | string | number | bigint, dst: string) {
-        let v: Uint8Array;
+    static fromHash(src: Bytes | string | number | bigint, dst: string) {
+        let v: Bytes;
         if (typeof src === 'string') {
             v = encodeUTF8(src);
         } else if (typeof src === 'number') {
@@ -33,7 +34,7 @@ export class Point {
         return new Point(hashToRistretto255(v, { DST: dst }));
     }
 
-    static encodeBytesToPoint(data: Uint8Array) {
+    static encodeBytesToPoint(data: Bytes) {
         if (data.length !== 16) {
             throw new Error('Must be 16 bytes');
         }
@@ -44,7 +45,7 @@ export class Point {
         return lizardDecode(point);
     }
 
-    static fromBytes(bytes: Uint8Array) {
+    static fromBytes(bytes: Bytes) {
         return new Point(RistrettoPoint.fromHex(bytes));
     }
 
@@ -74,7 +75,7 @@ export class Point {
         return new Point(this.#point.subtract(other.#point));
     }
 
-    toBytes() {
+    toBytes(): Bytes {
         return this.#point.toRawBytes();
     }
 

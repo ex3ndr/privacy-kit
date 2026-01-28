@@ -3,6 +3,7 @@ import { SignJWT } from 'jose';
 import { deriveSecureKey } from '../crypto/deriveSecureKey';
 import { ed25519 } from '@noble/curves/ed25519';
 import { encodeBase64 } from '../formats/base64';
+import type { Bytes } from '../../types';
 
 export async function createPersistentTokenGenerator(opts: {
     service: string,
@@ -46,7 +47,7 @@ export async function createPersistentTokenGenerator(opts: {
 
 export async function createPersistentTokenVerifier(opts: {
     service: string,
-    publicKey: Uint8Array
+    publicKey: Bytes
 }) {
 
     const key = await jose.importJWK({

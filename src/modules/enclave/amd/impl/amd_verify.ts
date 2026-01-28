@@ -3,8 +3,9 @@ import { p384 } from '@noble/curves/p384';
 import { sha384 } from "@noble/hashes/sha2";
 import { amdMilanCa } from "./amd_ca";
 import { concatBytes } from "../../../formats/bytes";
+import type { Bytes } from "../../../../types";
 
-export async function verifyAMD(data: Uint8Array, signature: Uint8Array, certificate: Uint8Array) {
+export async function verifyAMD(data: Bytes, signature: Bytes, certificate: Bytes) {
 
     // Load CA
     let chain = amdMilanCa.map((b) => new x509.X509Certificate(b)).reverse();

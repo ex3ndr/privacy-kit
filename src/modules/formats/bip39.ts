@@ -1,7 +1,8 @@
 import { sha256 } from "../crypto/sha256";
 import { normalizeNFKD } from "./text";
+import type { Bytes } from "../../types";
 
-export function encodeBip39(secret: Uint8Array): string[] {
+export function encodeBip39(secret: Bytes): string[] {
     if (secret.length !== 16 && secret.length !== 32) {
         throw new Error('Only 16 or 32 bytes secret keys are supported, got ' + secret.length);
     }
@@ -58,7 +59,7 @@ export function encodeBip39(secret: Uint8Array): string[] {
     return indexes.map(index => mnemonicWords[index]);
 }
 
-export function decodeBip39(mnemonics: string | (string[])): Uint8Array {
+export function decodeBip39(mnemonics: string | (string[])): Bytes {
 
     // Normalize mnemonics
     let words: string[];

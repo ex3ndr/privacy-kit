@@ -3,13 +3,14 @@ import { Point } from '../math/point';
 import { generateRandomScalar } from '../math/scalar';
 import { encodeUTF8 } from '@/modules/formats/text';
 import { Sigma } from './Sigma';
+import type { Bytes } from '../../../types';
 
 describe('Sigma Class', () => {
     let H: Point;
     let a: bigint;
     let b: bigint;
     let c: bigint;
-    let nonce: Uint8Array;
+    let nonce: Bytes;
 
     beforeEach(() => {
         H = Point.fromHash('generator_H', 'test_domain');

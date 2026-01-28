@@ -1,6 +1,7 @@
 import { randomBytes } from "../crypto/randomKey";
 import { Point } from "./math/point";
 import { deriveScalar } from "./math/scalar";
+import type { Bytes } from "../../types";
 
 //
 // ElGamal encryption
@@ -11,13 +12,13 @@ export function elgamalGenerateKeyPair() {
     return elgamalDeriveKeyPair(seed);
 }
 
-export function elgamalDeriveKeyPair(seed: Uint8Array) {
+export function elgamalDeriveKeyPair(seed: Bytes) {
     const sk = deriveScalar(seed, 'elgamal');
     const pk = Point.BASE.multiply(sk);
     return { sk, pk };
 }
 
-export function elgamalEncrypt(pk: Point, message: Uint8Array) {
+export function elgamalEncrypt(pk: Point, message: Bytes) {
     const r = deriveScalar(randomBytes(64), 'elgamal');
     const c1 = Point.BASE.multiply(r);
     const c2 = pk.add(Point.encodeBytesToPoint(message)).multiply(r);

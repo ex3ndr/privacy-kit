@@ -3,6 +3,7 @@ import { deriveScalar } from '../math/scalar';
 import { concatBytes, lengthPrefixed } from '@/modules/formats/bytes';
 import { encodeUTF8 } from '@/modules/formats/text';
 import { encodeBigInt } from '../../formats/bigint';
+import type { Bytes } from '../../../types';
 import {
     ProtocolInputVariables,
     ProtocolVerificationVariables,
@@ -21,8 +22,8 @@ export type SigmaProof<TScalars extends string = string> = {
 export function createSigmaProof<T extends SigmaProtocol<any, any, any>>(opts: {
     protocol: T,
     variables: ProtocolInputVariables<T>,
-    nonce: Uint8Array,
-    message: Uint8Array,
+    nonce: Bytes,
+    message: Bytes,
     usage: string
 }): {
     proof: SigmaProof<ExtractProtocolScalars<T>>;
@@ -70,7 +71,7 @@ export function createSigmaProof<T extends SigmaProtocol<any, any, any>>(opts: {
     // Step 2: Create initial SHO state by absorbing protocol, computed values, and generator points
     //
 
-    const transcript: Uint8Array[] = [
+    const transcript: Bytes[] = [
         lengthPrefixed(encodeUTF8(usage)),
         lengthPrefixed(protocol.descriptor),
         lengthPrefixed(message),
@@ -202,7 +203,7 @@ export function verifySigmaProof<
         protocol: SigmaProtocol<TScalars, TPoints, TCommitments>,
         proof: SigmaProof<TScalars>,
         variables: ProtocolVerificationVariables<SigmaProtocol<TScalars, TPoints, TCommitments>>,
-        message: Uint8Array,
+        message: Bytes,
         usage: string
     }
 ): { isValid: boolean; error?: string } {
@@ -214,7 +215,7 @@ export function verifySigmaProof<
         // Step 1: Create initial transcript exactly as the prover did
         //
 
-        const transcript: Uint8Array[] = [
+        const transcript: Bytes[] = [
             lengthPrefixed(encodeUTF8(usage)),
             lengthPrefixed(protocol.descriptor),
             lengthPrefixed(message),

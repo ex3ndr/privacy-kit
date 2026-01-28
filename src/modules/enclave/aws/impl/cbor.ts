@@ -7,6 +7,8 @@
  * Copyright (c) 2014-2016 Patrick Gansterer <paroga@paroga.com>
  */
 
+import type { Bytes } from "../../../../types";
+
 const POW_2_24: number = 5.960464477539063e-8;
 const POW_2_32: number = 4294967296;
 const POW_2_53: number = 9007199254740992;
@@ -14,7 +16,7 @@ const POW_2_53: number = 9007199254740992;
 type TagFunction = (value: any, tag: number) => any;
 type SimpleValueFunction = (value: number) => any;
 
-export function encodeCBOR(value: any): Uint8Array {
+export function encodeCBOR(value: any): Bytes {
     let data = new Uint8Array(256);
     let dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
     let lastLength: number;
@@ -54,7 +56,7 @@ export function encodeCBOR(value: any): Uint8Array {
         commitWrite();
     }
 
-    function writeUint8Array(value: Uint8Array): void {
+    function writeUint8Array(value: Bytes): void {
         const dataView = prepareWrite(value.length);
         for (let i = 0; i < value.length; ++i)
             dataView.setUint8(offset + i, value[i]);
@@ -189,7 +191,7 @@ export function encodeCBOR(value: any): Uint8Array {
 }
 
 export function decodeCBOR(
-    data: Uint8Array,
+    data: Bytes,
     tagger: TagFunction = (value) => value,
     simpleValue: SimpleValueFunction = () => undefined
 ): any {
@@ -201,7 +203,7 @@ export function decodeCBOR(
         return value;
     }
 
-    function readArrayBuffer(length: number): Uint8Array {
+    function readArrayBuffer(length: number): Bytes {
         return commitRead(length, data.slice(offset, offset + length));
     }
 
@@ -343,7 +345,7 @@ export function decodeCBOR(
                 return -1 - length;
             case 2:
                 if (length < 0) {
-                    const elements: Uint8Array[] = [];
+                    const elements: Bytes[] = [];
                     let fullArrayLength = 0;
                     while ((length = readIndefiniteStringLength(majorType)) >= 0) {
                         fullArrayLength += length;

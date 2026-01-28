@@ -2,6 +2,7 @@ import * as nacl from "tweetnacl";
 import { decodeUTF8, encodeUTF8 } from "../formats/text";
 import * as z from "zod";
 import { decodeUInt32, encodeUInt32 } from "../formats/bytes";
+import type { Bytes } from "../../types";
 
 export async function encodeRequest<T>(body: T) {
     const data = encodeUTF8(JSON.stringify(body));
@@ -15,7 +16,7 @@ export async function encodeRequest<T>(body: T) {
     }
 }
 
-export async function decodeRequest<T>(data: Uint8Array, schema: z.ZodSchema<T>) {
+export async function decodeRequest<T>(data: Bytes, schema: z.ZodSchema<T>) {
     if (data[0] !== 0) {
         return null;
     }
@@ -43,7 +44,7 @@ export async function decodeRequest<T>(data: Uint8Array, schema: z.ZodSchema<T>)
     }
 }
 
-export async function encryptResponse<T>(body: T, nonce: Uint8Array, publicKey: Uint8Array) {
+export async function encryptResponse<T>(body: T, nonce: Bytes, publicKey: Bytes) {
     const data = encodeUTF8(JSON.stringify(body));
     const keypair = nacl.box.keyPair();
     const expires = Math.floor(Date.now() / 1000) + 5 * 60; // 5 minutes
@@ -51,7 +52,7 @@ export async function encryptResponse<T>(body: T, nonce: Uint8Array, publicKey: 
     return new Uint8Array([1, ...keypair.publicKey, ...encrypted]);
 }
 
-export async function decryptResponse<T>(data: Uint8Array, nonce: Uint8Array, secretKey: Uint8Array, schema: z.ZodSchema<T>) {
+export async function decryptResponse<T>(data: Bytes, nonce: Bytes, secretKey: Bytes, schema: z.ZodSchema<T>) {
     if (data[0] !== 1) {
         return null;
     }

@@ -1,5 +1,6 @@
 import { encodeHex } from "@/modules/formats/hex";
 import { ByteReader } from "../../formats/bytes";
+import type { Bytes } from "../../../types";
 
 export type SNPAttestationVariant =
     | 'v2'
@@ -20,17 +21,17 @@ export type SNPAttestationDocument = {
     variant: SNPAttestationVariant;
     guestSvn: number;
     guestPolicy: SNPGuestPolicy;
-    familyId: Uint8Array;
-    imageId: Uint8Array;
-    measurement: Uint8Array;
+    familyId: Bytes;
+    imageId: Bytes;
+    measurement: Bytes;
     vmpl: number;
     sigAlgo: number;
-    reportData: Uint8Array;
-    hostData: Uint8Array;
-    idKeyDigest: Uint8Array;
-    authorKeyDigest: Uint8Array;
-    reportId: Uint8Array;
-    reportIdMa: Uint8Array;
+    reportData: Bytes;
+    hostData: Bytes;
+    idKeyDigest: Bytes;
+    authorKeyDigest: Bytes;
+    reportId: Bytes;
+    reportIdMa: Bytes;
     currentTCB: SNPTCBVersion;
     reportedTCB: SNPTCBVersion;
     platformInfo: SNPPlatformInfo;
@@ -44,8 +45,8 @@ export type SNPAttestationDocument = {
 
 export type SNPAttestation = {
     raw: {
-        protected: Uint8Array;
-        signature: Uint8Array;
+        protected: Bytes;
+        signature: Bytes;
     },
     document: SNPAttestationDocument
 }
@@ -81,16 +82,16 @@ export type SNPCPUInfo = {
     famId: number | null;
     modId: number | null;
     step: number | null;
-    chipId: Uint8Array;
+    chipId: Bytes;
     fmspc: string;
 }
 
 export type SNPAttestationSignature = {
-    r: Uint8Array;
-    s: Uint8Array;
+    r: Bytes;
+    s: Bytes;
 }
 
-export function parseSNPAttestation(attestation: Uint8Array): SNPAttestation | null {
+export function parseSNPAttestation(attestation: Bytes): SNPAttestation | null {
     if (attestation.length !== 1184) {
         return null;
     }

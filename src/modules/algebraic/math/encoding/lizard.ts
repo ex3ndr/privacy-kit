@@ -1,6 +1,7 @@
 import { Point } from '../point';
 import { elligatorEncode, elligatorDecode } from './elligator';
 import { sha256 } from '@/modules/crypto/sha256';
+import type { Bytes } from '../../../../types';
 
 /**
  * Lizard encoding - encode 16 bytes of data into a Ristretto point
@@ -13,7 +14,7 @@ import { sha256 } from '@/modules/crypto/sha256';
  * @param data 16 bytes of data to encode
  * @returns A Point encoding the data
  */
-export function lizardEncode(data: Uint8Array): Point {
+export function lizardEncode(data: Bytes): Point {
     if (data.length !== 16) {
         throw new Error('Lizard encoding requires exactly 16 bytes of data');
     }
@@ -53,11 +54,11 @@ export function lizardEncode(data: Uint8Array): Point {
  * @param point The Point to decode
  * @returns The original 16 bytes of data, or null if decoding fails
  */
-export function lizardDecode(point: Point): Uint8Array | null {
+export function lizardDecode(point: Point): Bytes | null {
     // Get all possible Elligator preimages
     const preimages = elligatorDecode(point);
     
-    let result: Uint8Array | null = null;
+    let result: Bytes | null = null;
     let nFound = 0;
     
     for (const preimage of preimages) {

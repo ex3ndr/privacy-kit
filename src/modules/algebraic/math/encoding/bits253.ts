@@ -1,5 +1,6 @@
 import { Point } from '../point';
 import { elligatorEncode, elligatorDecode } from './elligator';
+import type { Bytes } from '../../../../types';
 
 /**
  * Direct encoding of up to 253 bits as a Ristretto point
@@ -8,7 +9,7 @@ import { elligatorEncode, elligatorDecode } from './elligator';
  * @param data Up to 32 bytes of data
  * @returns A Point encoding the data
  */
-export function encode253Bits(data: Uint8Array): Point {
+export function encode253Bits(data: Bytes): Point {
     if (data.length > 32) {
         throw new Error('Maximum 32 bytes allowed for 253-bit encoding');
     }
@@ -34,9 +35,9 @@ export function encode253Bits(data: Uint8Array): Point {
  * @param point The Point to decode
  * @returns Array of possible decoded values and a mask indicating which are valid
  */
-export function decode253Bits(point: Point): { mask: number, values: Uint8Array[] } {
+export function decode253Bits(point: Point): { mask: number, values: Bytes[] } {
     const preimages = elligatorDecode(point);
-    const values: Uint8Array[] = [];
+    const values: Bytes[] = [];
     let mask = 0;
     
     for (let i = 0; i < preimages.length; i++) {

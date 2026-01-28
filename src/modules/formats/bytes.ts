@@ -1,6 +1,7 @@
 import { decodeUTF8 } from "./text";
+import type { Bytes } from "../../types";
 
-export function concatBytes(...arrays: Uint8Array[]): Uint8Array {
+export function concatBytes(...arrays: Bytes[]): Bytes {
     let length = 0;
     for (const arr of arrays) {
         length += arr.length;
@@ -14,7 +15,7 @@ export function concatBytes(...arrays: Uint8Array[]): Uint8Array {
     return result;
 }
 
-export function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
+export function equalBytes(a: Bytes, b: Bytes): boolean {
     if (a.length !== b.length) {
         return false;
     }
@@ -25,7 +26,7 @@ export function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
     return result === 0;
 }
 
-export function encodeUInt32(value: number): Uint8Array {
+export function encodeUInt32(value: number): Bytes {
     return new Uint8Array([
         (value >> 24) & 0xff,
         (value >> 16) & 0xff,
@@ -34,11 +35,11 @@ export function encodeUInt32(value: number): Uint8Array {
     ]);
 }
 
-export function decodeUInt32(value: Uint8Array): number {
+export function decodeUInt32(value: Bytes): number {
     return (value[0] << 24) | (value[1] << 16) | (value[2] << 8) | value[3];
 }
 
-export function padBytes(value: Uint8Array, length: number): Uint8Array {
+export function padBytes(value: Bytes, length: number): Bytes {
     if (value.length >= length) {
         throw new Error('Value is too long');
     }
@@ -55,7 +56,7 @@ export function padBytes(value: Uint8Array, length: number): Uint8Array {
  * @param data - The data to prefix with its length
  * @returns The length-prefixed data
  */
-export function lengthPrefixed(data: Uint8Array): Uint8Array {
+export function lengthPrefixed(data: Bytes): Bytes {
     const length = data.length;
     
     if (length < 0) {
@@ -101,9 +102,9 @@ export function lengthPrefixed(data: Uint8Array): Uint8Array {
 
 export class ByteReader {
     #offset = 0;
-    #bytes: Uint8Array;
+    #bytes: Bytes;
 
-    constructor(bytes: Uint8Array) {
+    constructor(bytes: Bytes) {
         this.#bytes = bytes;
     }
 
@@ -138,7 +139,7 @@ export class ByteReader {
         return value;
     }
 
-    readBytes(length: number): Uint8Array {
+    readBytes(length: number): Bytes {
         if (this.#offset + length > this.#bytes.length) {
             throw new Error('EOF');
         }

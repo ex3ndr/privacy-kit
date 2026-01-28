@@ -11,6 +11,7 @@ export {
     encodeUTF8,
     normalizeNFKD
 } from './modules/formats/text';
+export type { Bytes } from './types';
 export {
     concatBytes,
     equalBytes,

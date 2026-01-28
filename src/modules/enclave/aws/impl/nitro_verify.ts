@@ -5,8 +5,9 @@ import { decodeHex } from "../../../formats/hex";
 import { p384 } from '@noble/curves/p384';
 import { sha384 } from "@noble/hashes/sha2";
 import { encodeCBOR } from "./cbor";
+import type { Bytes } from "../../../../types";
 
-export async function verifyNitroChain(chain: Uint8Array[]) {
+export async function verifyNitroChain(chain: Bytes[]) {
 
     //
     // NOTE: We dont care about the timing attacks here, since we are verifying the public certificate
@@ -81,9 +82,9 @@ export async function verifyNitroChain(chain: Uint8Array[]) {
 }
 
 export async function verifyNitroSignature(opts: {
-    publicKey: Uint8Array,
-    message: Uint8Array,
-    signature: Uint8Array
+    publicKey: Bytes,
+    message: Bytes,
+    signature: Bytes
 }) {
     const data = sha384(opts.message);
     const sig = p384.Signature.fromCompact(opts.signature);
@@ -94,8 +95,8 @@ export async function verifyNitroSignature(opts: {
 }
 
 export function createSignedBundle(opts: {
-    protectedHeader: Uint8Array,
-    data: Uint8Array
+    protectedHeader: Bytes,
+    data: Bytes
 }) {
     const signedData = encodeCBOR([
         "Signature1",

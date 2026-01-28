@@ -1,5 +1,6 @@
 import { Point } from "./math/point";
 import { generateRandomScalar, isValidScalar } from "./math/scalar";
+import type { Bytes } from "../../types";
 
 export class MacGGM<TMessages extends readonly string[]> {
 
@@ -80,7 +81,6 @@ export class MacGGMKey<TMessages extends readonly string[]> {
 
 
 export type MacGGMMessage<TMessages extends readonly string[]> = {
-    [key in keyof TMessages]: Uint8Array;
+    [key in keyof TMessages]: Bytes;
 }
-
 

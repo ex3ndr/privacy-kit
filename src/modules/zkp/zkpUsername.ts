@@ -5,6 +5,7 @@ import { encodeUsername } from "./utils/encodeUsername";
 import { concatBytes } from "../formats/bytes";
 import { deriveScalar } from "../algebraic/math/scalar";
 import { randomBytes } from "../crypto/randomKey";
+import type { Bytes } from "../../types";
 
 /**
  * Hashes and proofs knowledge of a username using Signal's algorithm.
@@ -13,7 +14,7 @@ import { randomBytes } from "../crypto/randomKey";
  * @param discriminator - The numeric discriminator
  * @returns The proof with hash in it
  */
-export function zkUsernameProof(nickname: string, discriminator: number): Uint8Array {
+export function zkUsernameProof(nickname: string, discriminator: number): Bytes {
 
     // Validate inputs
     if (!nickname || nickname.length === 0) {
@@ -52,7 +53,7 @@ export function zkUsernameProof(nickname: string, discriminator: number): Uint8A
  * @param nonce - The nonce used to create the proof
  * @returns Stable hash of the username
  */
-export function zkUsernameVerify(proof: Uint8Array): Uint8Array | null {
+export function zkUsernameVerify(proof: Bytes): Bytes | null {
     const ok = PROTOCOL.verify({ proof });
     if (!ok) {
         return null;

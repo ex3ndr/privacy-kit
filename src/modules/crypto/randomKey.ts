@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import type { Bytes } from '../../types';
 
 /**
  * Generates a random key with a specified prefix.
@@ -30,12 +31,12 @@ export function randomKey(prefix: string, length: number = 24): string {
  * Generates cryptographically secure random bytes.
  * 
  * @param {number} length - The number of bytes to generate
- * @returns {Uint8Array} A Uint8Array containing random bytes
+ * @returns {Bytes} A byte array containing random bytes
  * 
  * @example
  * const bytes = randomBytes(32);
  * console.log(bytes);
  */
-export function randomBytes(length: number): Uint8Array {
+export function randomBytes(length: number): Bytes {
     return new Uint8Array(crypto.randomBytes(length));
 }

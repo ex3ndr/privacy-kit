@@ -4,14 +4,15 @@ import { deriveSecretKeyTreeChild } from "../crypto/deriveKey";
 import * as crypto from 'crypto';
 import * as tweetnacl from 'tweetnacl';
 import { hmac_sha512 } from "../crypto/hmac_sha512";
+import type { Bytes } from "../../types";
 
 const PACKAGE_AES_BUFFER = 0;
 
 export class KeyTree {
 
-    #master: Uint8Array
+    #master: Bytes
 
-    constructor(master: Uint8Array) {
+    constructor(master: Bytes) {
         this.#master = master;
         Object.freeze(this);
     }
@@ -29,11 +30,11 @@ export class KeyTree {
     // Derive keys
     //
 
-    deriveSymmetricKey(path: string[]): Uint8Array {
+    deriveSymmetricKey(path: string[]): Bytes {
         return this.#deriveKey('aes256', [...path]);
     }
 
-    deriveCurve25519Key(path: string[]): { secret: Uint8Array, public: Uint8Array } {
+    deriveCurve25519Key(path: string[]): { secret: Bytes, public: Bytes } {
         const seed = this.#deriveKey('nacl', path);
         const keypair = tweetnacl.box.keyPair.fromSecretKey(seed);
         return {
@@ -46,7 +47,7 @@ export class KeyTree {
     // Hashing
     //
 
-    hash(path: string[], data: Uint8Array | string): Uint8Array {
+    hash(path: string[], data: Bytes | string): Bytes {
         const key = this.#deriveKey('hmac_sha512', [...path]);
         return hmac_sha512(key, data);
     }
@@ -55,7 +56,7 @@ export class KeyTree {
     // Encryption
     //
 
-    symmetricEncrypt(path: string[], data: Uint8Array | string): Uint8Array {
+    symmetricEncrypt(path: string[], data: Bytes | string): Bytes {
         const key = this.deriveSymmetricKey(path);
         const nonce = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
@@ -71,7 +72,7 @@ export class KeyTree {
         );
     }
 
-    symmetricDecryptBuffer(path: string[], data: Uint8Array): Uint8Array {
+    symmetricDecryptBuffer(path: string[], data: Bytes): Bytes {
         if (data[0] !== PACKAGE_AES_BUFFER) {
             throw new Error('Invalid data');
         }
@@ -87,12 +88,12 @@ export class KeyTree {
         return concatBytes(decrypted, decryptedFinal);
     }
 
-    symmetricDecryptString(path: string[], data: Uint8Array): string {
+    symmetricDecryptString(path: string[], data: Bytes): string {
         const decrypted = this.symmetricDecryptBuffer(path, data);
         return decodeUTF8(decrypted);
     }
 
-    #deriveKey(algo: string, path: string[]): Uint8Array {
+    #deriveKey(algo: string, path: string[]): Bytes {
         for (let p of path) {
             if (p.startsWith('#')) {
                 throw new Error('Path element cannot start with #');
@@ -112,7 +113,7 @@ export class KeyTree {
         }
     }
 
-    #deriveSubtreeKey(path: string[]): Uint8Array {
+    #deriveSubtreeKey(path: string[]): Bytes {
         for (let p of path) {
             if (p.startsWith('#')) {
                 throw new Error('Path element cannot start with #');
